@@ -7,9 +7,12 @@ import type {
   Target,
   TargetInput,
   RebalanceResult,
+  QuestradeStatus,
+  QuestradeAccount,
+  SyncResult,
 } from "./types";
 
-const BASE = "http://localhost:8000/api";
+const BASE = "http://localhost:8001/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -65,3 +68,28 @@ export const setTargets = (portfolioId: number, data: TargetInput[]) =>
 // Rebalance
 export const getRebalance = (portfolioId: number) =>
   request<RebalanceResult>(`/portfolios/${portfolioId}/rebalance`);
+
+// Questrade
+export const questradeAuth = (refreshToken: string) =>
+  request<{ status: string }>("/questrade/auth", {
+    method: "POST",
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+export const questradeStatus = () =>
+  request<QuestradeStatus>("/questrade/status");
+
+export const questradeDisconnect = () =>
+  request<{ status: string }>("/questrade/auth", { method: "DELETE" });
+
+export const questradeAccounts = () =>
+  request<{ accounts: QuestradeAccount[] }>("/questrade/accounts");
+
+export const questradeSyncHoldings = (
+  portfolioId: number,
+  accountNumbers?: string[],
+) =>
+  request<SyncResult>(`/questrade/sync/${portfolioId}`, {
+    method: "POST",
+    body: JSON.stringify({ account_numbers: accountNumbers || null }),
+  });

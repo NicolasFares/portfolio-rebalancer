@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from .database import Base, engine
-from .routers import portfolios, holdings, targets
+from .routers import portfolios, holdings, targets, questrade
 
 
 def _migrate(engine):
@@ -36,3 +36,4 @@ app.add_middleware(
 app.include_router(portfolios.router)
 app.include_router(holdings.router)
 app.include_router(targets.router)
+app.include_router(questrade.router)

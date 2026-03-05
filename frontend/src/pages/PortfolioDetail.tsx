@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { PortfolioDetail as PDetail, HoldingInput } from "../types";
-import { getPortfolio, addHolding, deleteHolding, updateHolding, updatePortfolio } from "../api";
+import type { PortfolioDetail as PDetail, HoldingInput, QuestradeAccount, SyncResult } from "../types";
+import { getPortfolio, addHolding, deleteHolding, updateHolding, updatePortfolio, questradeStatus, questradeAccounts, questradeSyncHoldings } from "../api";
 
 const ASSET_TYPES = ["equity", "bond", "crypto", "cash", "other", "managed"] as const;
 const BREAKDOWN_CATEGORIES = ["equity", "bond", "crypto", "cash"] as const;
@@ -35,6 +35,12 @@ export default function PortfolioDetail() {
   const [editingRates, setEditingRates] = useState(false);
   const [eurRate, setEurRate] = useState(0);
   const [usdRate, setUsdRate] = useState(0);
+  const [qtConnected, setQtConnected] = useState(false);
+  const [qtAccounts, setQtAccounts] = useState<QuestradeAccount[]>([]);
+  const [qtSelectedAccounts, setQtSelectedAccounts] = useState<Set<string>>(new Set());
+  const [qtSyncing, setQtSyncing] = useState(false);
+  const [qtSyncResult, setQtSyncResult] = useState<SyncResult | null>(null);
+  const [qtError, setQtError] = useState("");
 
   const load = () => {
     if (!id) return;
@@ -46,6 +52,48 @@ export default function PortfolioDetail() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    questradeStatus().then((s) => {
+      const connected = s.status === "connected" || s.status === "expired";
+      setQtConnected(connected);
+      if (connected) {
+        questradeAccounts()
+          .then((r) => {
+            setQtAccounts(r.accounts);
+            setQtSelectedAccounts(new Set(r.accounts.map((a) => a.number)));
+          })
+          .catch(() => {});
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleSync = async () => {
+    setQtSyncing(true);
+    setQtError("");
+    setQtSyncResult(null);
+    try {
+      const selected = qtSelectedAccounts.size === qtAccounts.length
+        ? undefined
+        : Array.from(qtSelectedAccounts);
+      const result = await questradeSyncHoldings(Number(id), selected);
+      setQtSyncResult(result);
+      load();
+    } catch (e: any) {
+      setQtError(e.message || "Sync failed");
+    } finally {
+      setQtSyncing(false);
+    }
+  };
+
+  const toggleAccount = (num: string) => {
+    setQtSelectedAccounts((prev) => {
+      const next = new Set(prev);
+      if (next.has(num)) next.delete(num);
+      else next.add(num);
+      return next;
+    });
+  };
 
   if (!portfolio) return <div>Loading...</div>;
 
@@ -133,6 +181,76 @@ export default function PortfolioDetail() {
           </Link>
         </div>
       </div>
+
+      {/* Questrade Sync */}
+      {qtConnected && (
+        <div className="card">
+          <div className="flex-between">
+            <h2 style={{ marginBottom: 0 }}>Questrade Sync</h2>
+            <button
+              className="btn-primary"
+              onClick={handleSync}
+              disabled={qtSyncing || qtSelectedAccounts.size === 0}
+            >
+              {qtSyncing ? "Syncing..." : "Sync from Questrade"}
+            </button>
+          </div>
+          {qtAccounts.length > 0 && (
+            <div className="flex" style={{ marginTop: "0.75rem", flexWrap: "wrap" }}>
+              {qtAccounts.map((a) => (
+                <label
+                  key={a.number}
+                  className="flex"
+                  style={{ gap: "0.35rem", fontSize: "0.85rem", cursor: "pointer" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={qtSelectedAccounts.has(a.number)}
+                    onChange={() => toggleAccount(a.number)}
+                  />
+                  {a.type} ({a.number})
+                </label>
+              ))}
+            </div>
+          )}
+          {qtError && (
+            <div style={{ color: "var(--red)", fontSize: "0.85rem", marginTop: "0.5rem" }}>
+              {qtError}
+            </div>
+          )}
+          {qtSyncResult && (
+            <div style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+              <div style={{ marginBottom: "0.5rem" }}>
+                <span className="positive" style={{ marginRight: "1rem" }}>
+                  +{qtSyncResult.added} added
+                </span>
+                <span style={{ color: "var(--blue)" }}>
+                  {qtSyncResult.updated} updated
+                </span>
+              </div>
+              {qtSyncResult.changes.length > 0 && (
+                <div style={{ maxHeight: 200, overflow: "auto" }}>
+                  {qtSyncResult.changes.map((c, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        padding: "0.25rem 0",
+                        borderBottom: "1px solid var(--border)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      <span style={{ color: c.action === "added" ? "var(--green)" : "var(--blue)" }}>
+                        {c.action}
+                      </span>{" "}
+                      <strong>{c.ticker}</strong> — {c.details}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Exchange Rates */}
       <div className="card">

@@ -72,3 +72,30 @@ export interface PortfolioInput {
   eur_to_base?: number;
   usd_to_base?: number;
 }
+
+// Questrade
+export interface QuestradeStatus {
+  status: "connected" | "expired" | "not_configured";
+  message?: string;
+}
+
+export interface QuestradeAccount {
+  type: string;
+  number: string;
+  status: string;
+  isPrimary: boolean;
+  isBilling: boolean;
+  clientAccountType: string;
+}
+
+export interface SyncChange {
+  ticker: string;
+  action: "added" | "updated";
+  details: string;
+}
+
+export interface SyncResult {
+  added: number;
+  updated: number;
+  changes: SyncChange[];
+}
