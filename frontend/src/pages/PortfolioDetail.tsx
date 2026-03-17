@@ -3,15 +3,20 @@ import { useParams, Link } from "react-router-dom";
 import type { PortfolioDetail as PDetail, HoldingInput, QuestradeAccount, SyncResult } from "../types";
 import { getPortfolio, addHolding, deleteHolding, updateHolding, updatePortfolio, questradeStatus, questradeAccounts, questradeSyncHoldings } from "../api";
 
-const ASSET_TYPES = ["equity", "bond", "crypto", "cash", "other", "managed"] as const;
-const BREAKDOWN_CATEGORIES = ["equity", "bond", "crypto", "cash"] as const;
+const ASSET_TYPES = ["equity", "bond", "crypto", "commodity", "other", "managed"] as const;
+const BREAKDOWN_CATEGORIES = ["equity", "bond", "crypto", "cash", "commodity"] as const;
 const CURRENCIES = ["CAD", "EUR", "USD"] as const;
+const DIMENSIONS = ["asset_type", "sector", "geography"] as const;
+const DIMENSION_LABELS: Record<string, string> = { asset_type: "Asset Type", sector: "Sector", geography: "Geography" };
+const SECTOR_SUGGESTIONS = ["broad_market", "defense", "technology", "energy", "gold", "healthcare", "financials"];
+const GEO_SUGGESTIONS = ["US", "EU", "Global", "CAD", "Emerging"];
 
 const BAR_COLORS: Record<string, string> = {
   equity: "var(--accent)",
   bond: "var(--blue)",
   crypto: "var(--yellow)",
   cash: "var(--green)",
+  commodity: "var(--orange)",
   other: "var(--text-muted)",
 };
 
@@ -22,7 +27,9 @@ const emptyHolding: HoldingInput = {
   quantity: 0,
   price_per_unit: 0,
   currency: "CAD",
-  account: "",
+  account_id: 0,
+  sector: "",
+  geography: "",
 };
 
 export default function PortfolioDetail() {
@@ -41,6 +48,8 @@ export default function PortfolioDetail() {
   const [qtSyncing, setQtSyncing] = useState(false);
   const [qtSyncResult, setQtSyncResult] = useState<SyncResult | null>(null);
   const [qtError, setQtError] = useState("");
+  const [chartDimension, setChartDimension] = useState<string>("asset_type");
+  const [filterAccountId, setFilterAccountId] = useState<number | undefined>(undefined);
 
   const load = () => {
     if (!id) return;
@@ -48,6 +57,10 @@ export default function PortfolioDetail() {
       setPortfolio(p);
       setEurRate(p.eur_to_base);
       setUsdRate(p.usd_to_base);
+      // Default form account_id to first account
+      if (p.accounts.length > 0 && form.account_id === 0) {
+        setForm((f) => ({ ...f, account_id: p.accounts[0].id }));
+      }
     });
   };
 
@@ -97,35 +110,61 @@ export default function PortfolioDetail() {
 
   if (!portfolio) return <div>Loading...</div>;
 
-  const totalValue = portfolio.holdings.reduce((sum, h) => {
-    const val = h.quantity * h.price_per_unit;
-    if (h.currency === portfolio.base_currency) return sum + val;
-    if (h.currency === "EUR") return sum + val * portfolio.eur_to_base;
-    if (h.currency === "USD") return sum + val * portfolio.usd_to_base;
-    return sum + val;
+  // Filter holdings by account
+  const filteredHoldings = filterAccountId !== undefined
+    ? portfolio.holdings.filter((h) => h.account_id === filterAccountId)
+    : portfolio.holdings;
+
+  // Compute total value from holdings + account cash
+  const toBase = (val: number, currency: string) => {
+    if (currency === portfolio.base_currency) return val;
+    if (currency === "EUR") return val * portfolio.eur_to_base;
+    if (currency === "USD") return val * portfolio.usd_to_base;
+    return val;
+  };
+
+  const holdingsValue = portfolio.holdings.reduce((sum, h) => {
+    return sum + toBase(h.quantity * h.price_per_unit, h.currency);
   }, 0);
 
-  const byType: Record<string, number> = {};
-  portfolio.holdings.forEach((h) => {
-    const val = h.quantity * h.price_per_unit;
-    let converted = val;
-    if (h.currency !== portfolio.base_currency) {
-      if (h.currency === "EUR") converted = val * portfolio.eur_to_base;
-      else if (h.currency === "USD") converted = val * portfolio.usd_to_base;
-    }
-    if (h.allocation_breakdown) {
-      for (const [cat, pct] of Object.entries(h.allocation_breakdown)) {
-        byType[cat] = (byType[cat] || 0) + converted * (pct / 100);
+  const accountCashValue = portfolio.accounts.reduce((sum, a) => {
+    return sum + toBase(a.cash_balance, a.currency);
+  }, 0);
+
+  const totalValue = holdingsValue + accountCashValue;
+
+  const computeByDimension = (dim: string) => {
+    const result: Record<string, number> = {};
+    portfolio.holdings.forEach((h) => {
+      const converted = toBase(h.quantity * h.price_per_unit, h.currency);
+      if (dim === "asset_type") {
+        if (h.allocation_breakdown) {
+          for (const [cat, pct] of Object.entries(h.allocation_breakdown)) {
+            result[cat] = (result[cat] || 0) + converted * (pct / 100);
+          }
+        } else {
+          result[h.asset_type] = (result[h.asset_type] || 0) + converted;
+        }
+      } else if (dim === "sector") {
+        const key = h.sector || "unclassified";
+        result[key] = (result[key] || 0) + converted;
+      } else if (dim === "geography") {
+        const key = h.geography || "unclassified";
+        result[key] = (result[key] || 0) + converted;
       }
-    } else {
-      byType[h.asset_type] = (byType[h.asset_type] || 0) + converted;
+    });
+    // Add account cash to "cash" category for asset_type
+    if (dim === "asset_type" && accountCashValue > 0) {
+      result["cash"] = (result["cash"] || 0) + accountCashValue;
     }
-  });
+    return result;
+  };
+  const byType = computeByDimension(chartDimension);
 
   const handleAddHolding = async (e: React.FormEvent) => {
     e.preventDefault();
     await addHolding(Number(id), form);
-    setForm({ ...emptyHolding });
+    setForm({ ...emptyHolding, account_id: form.account_id });
     setShowForm(false);
     load();
   };
@@ -135,7 +174,7 @@ export default function PortfolioDetail() {
     load();
   };
 
-  const startEditing = (h: HoldingInput & { id: number; allocation_breakdown?: Record<string, number> | null }) => {
+  const startEditing = (h: any) => {
     setEditingId(h.id);
     setEditForm({
       name: h.name,
@@ -144,7 +183,9 @@ export default function PortfolioDetail() {
       quantity: h.quantity,
       price_per_unit: h.price_per_unit,
       currency: h.currency,
-      account: h.account || "",
+      account_id: h.account_id,
+      sector: h.sector || "",
+      geography: h.geography || "",
       allocation_breakdown: h.allocation_breakdown || null,
     });
   };
@@ -166,6 +207,104 @@ export default function PortfolioDetail() {
   const fmt = (n: number) =>
     n.toLocaleString("en-CA", { style: "currency", currency: portfolio.base_currency });
 
+  const renderHoldingForm = (currentForm: HoldingInput, setCurrentForm: (f: HoldingInput) => void, isEdit: boolean) => (
+    <>
+      <div className="grid-form">
+        <label>
+          Name
+          <input required value={currentForm.name} onChange={(e) => setCurrentForm({ ...currentForm, name: e.target.value })} />
+        </label>
+        <label>
+          Ticker
+          <input value={currentForm.ticker || ""} onChange={(e) => setCurrentForm({ ...currentForm, ticker: e.target.value })} placeholder="e.g. VOO" />
+        </label>
+        <label>
+          Type
+          <select
+            value={currentForm.asset_type}
+            onChange={(e) => {
+              const newType = e.target.value;
+              const clearBreakdown = newType !== "managed" ? { allocation_breakdown: null } : {};
+              setCurrentForm({ ...currentForm, asset_type: newType, ...clearBreakdown });
+            }}
+          >
+            {ASSET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label>
+          Quantity
+          <input type="number" step="any" required value={currentForm.quantity || ""} onChange={(e) => setCurrentForm({ ...currentForm, quantity: Number(e.target.value) })} />
+        </label>
+        <label>
+          Price/Unit
+          <input type="number" step="any" required value={currentForm.price_per_unit || ""} onChange={(e) => setCurrentForm({ ...currentForm, price_per_unit: Number(e.target.value) })} />
+        </label>
+        <label>
+          Currency
+          <select value={currentForm.currency} onChange={(e) => setCurrentForm({ ...currentForm, currency: e.target.value })}>
+            {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        <label>
+          Account
+          <select value={currentForm.account_id} onChange={(e) => setCurrentForm({ ...currentForm, account_id: Number(e.target.value) })}>
+            {portfolio.accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Sector
+          <input list="sector-suggestions" value={currentForm.sector || ""} onChange={(e) => setCurrentForm({ ...currentForm, sector: e.target.value })} placeholder="e.g. defense" />
+          <datalist id="sector-suggestions">
+            {SECTOR_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
+          </datalist>
+        </label>
+        <label>
+          Geography
+          <input list="geo-suggestions" value={currentForm.geography || ""} onChange={(e) => setCurrentForm({ ...currentForm, geography: e.target.value })} placeholder="e.g. US" />
+          <datalist id="geo-suggestions">
+            {GEO_SUGGESTIONS.map((g) => <option key={g} value={g} />)}
+          </datalist>
+        </label>
+      </div>
+      {currentForm.asset_type === "managed" && (
+        <div style={{ marginTop: "0.75rem", padding: "0.75rem", background: "var(--surface)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+          <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+            Allocation Breakdown (must sum to 100%)
+          </div>
+          <div className="grid-form">
+            {BREAKDOWN_CATEGORIES.map((cat) => {
+              const bd = currentForm.allocation_breakdown || {};
+              return (
+                <label key={cat}>
+                  {cat} %
+                  <input
+                    type="number" step="any" min="0" max="100"
+                    value={bd[cat] ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : Number(e.target.value);
+                      const updated = { ...bd, [cat]: val };
+                      const cleaned: Record<string, number> = {};
+                      for (const [k, v] of Object.entries(updated)) {
+                        if (v > 0) cleaned[k] = v;
+                      }
+                      setCurrentForm({ ...currentForm, allocation_breakdown: Object.keys(cleaned).length > 0 ? cleaned : null });
+                    }}
+                    placeholder="0"
+                  />
+                </label>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+            Total: {Object.values(currentForm.allocation_breakdown || {}).reduce((s, v) => s + v, 0)}%
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div>
       <div className="flex-between" style={{ marginBottom: "1.5rem" }}>
@@ -176,6 +315,9 @@ export default function PortfolioDetail() {
           </span>
         </div>
         <div className="flex">
+          <Link to={`/portfolio/${id}/accounts`}>
+            <button className="btn-ghost">Accounts</button>
+          </Link>
           <Link to={`/portfolio/${id}/rebalance`}>
             <button className="btn-primary">Rebalance</button>
           </Link>
@@ -295,7 +437,20 @@ export default function PortfolioDetail() {
       {/* Allocation Chart */}
       {Object.keys(byType).length > 0 && (
         <div className="card">
-          <h2>Current Allocation</h2>
+          <div className="flex-between">
+            <h2 style={{ marginBottom: 0 }}>Current Allocation</h2>
+            <div className="dimension-tabs">
+              {DIMENSIONS.map((d) => (
+                <button
+                  key={d}
+                  className={`dimension-tab${chartDimension === d ? " active" : ""}`}
+                  onClick={() => setChartDimension(d)}
+                >
+                  {DIMENSION_LABELS[d]}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="bar-chart">
             {Object.entries(byType)
               .sort((a, b) => b[1] - a[1])
@@ -324,12 +479,26 @@ export default function PortfolioDetail() {
       {/* Holdings Table */}
       <div className="card">
         <div className="flex-between" style={{ marginBottom: "1rem" }}>
-          <h2 style={{ marginBottom: 0 }}>Holdings ({portfolio.holdings.length})</h2>
-          {editingId === null && (
-            <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-              {showForm ? "Cancel" : "Add Holding"}
-            </button>
-          )}
+          <h2 style={{ marginBottom: 0 }}>Holdings ({filteredHoldings.length})</h2>
+          <div className="flex">
+            {/* Account filter */}
+            <div className="filter-bar">
+              <select
+                value={filterAccountId ?? ""}
+                onChange={(e) => setFilterAccountId(e.target.value ? Number(e.target.value) : undefined)}
+              >
+                <option value="">All Accounts</option>
+                {portfolio.accounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+            {editingId === null && (
+              <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
+                {showForm ? "Cancel" : "Add Holding"}
+              </button>
+            )}
+          </div>
         </div>
 
         {(showForm || editingId !== null) && (
@@ -346,144 +515,10 @@ export default function PortfolioDetail() {
             <div style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.75rem", color: editingId !== null ? "var(--accent)" : "var(--text)" }}>
               {editingId !== null ? "Editing holding" : "New holding"}
             </div>
-            <div className="grid-form">
-              <label>
-                Name
-                <input
-                  required
-                  value={editingId !== null ? editForm.name : form.name}
-                  onChange={(e) =>
-                    editingId !== null
-                      ? setEditForm({ ...editForm, name: e.target.value })
-                      : setForm({ ...form, name: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Ticker
-                <input
-                  value={(editingId !== null ? editForm.ticker : form.ticker) || ""}
-                  onChange={(e) =>
-                    editingId !== null
-                      ? setEditForm({ ...editForm, ticker: e.target.value })
-                      : setForm({ ...form, ticker: e.target.value })
-                  }
-                  placeholder="e.g. VOO"
-                />
-              </label>
-              <label>
-                Type
-                <select
-                  value={editingId !== null ? editForm.asset_type : form.asset_type}
-                  onChange={(e) => {
-                    const newType = e.target.value;
-                    const clearBreakdown = newType !== "managed" ? { allocation_breakdown: null } : {};
-                    editingId !== null
-                      ? setEditForm({ ...editForm, asset_type: newType, ...clearBreakdown })
-                      : setForm({ ...form, asset_type: newType, ...clearBreakdown });
-                  }}
-                >
-                  {ASSET_TYPES.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Quantity
-                <input
-                  type="number"
-                  step="any"
-                  required
-                  value={(editingId !== null ? editForm.quantity : form.quantity) || ""}
-                  onChange={(e) =>
-                    editingId !== null
-                      ? setEditForm({ ...editForm, quantity: Number(e.target.value) })
-                      : setForm({ ...form, quantity: Number(e.target.value) })
-                  }
-                />
-              </label>
-              <label>
-                Price/Unit
-                <input
-                  type="number"
-                  step="any"
-                  required
-                  value={(editingId !== null ? editForm.price_per_unit : form.price_per_unit) || ""}
-                  onChange={(e) =>
-                    editingId !== null
-                      ? setEditForm({ ...editForm, price_per_unit: Number(e.target.value) })
-                      : setForm({ ...form, price_per_unit: Number(e.target.value) })
-                  }
-                />
-              </label>
-              <label>
-                Currency
-                <select
-                  value={editingId !== null ? editForm.currency : form.currency}
-                  onChange={(e) =>
-                    editingId !== null
-                      ? setEditForm({ ...editForm, currency: e.target.value })
-                      : setForm({ ...form, currency: e.target.value })
-                  }
-                >
-                  {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Account
-                <input
-                  value={(editingId !== null ? editForm.account : form.account) || ""}
-                  onChange={(e) =>
-                    editingId !== null
-                      ? setEditForm({ ...editForm, account: e.target.value })
-                      : setForm({ ...form, account: e.target.value })
-                  }
-                  placeholder="e.g. TFSA"
-                />
-              </label>
-            </div>
-            {((editingId !== null ? editForm.asset_type : form.asset_type) === "managed") && (
-              <div style={{ marginTop: "0.75rem", padding: "0.75rem", background: "var(--surface)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-                  Allocation Breakdown (must sum to 100%)
-                </div>
-                <div className="grid-form">
-                  {BREAKDOWN_CATEGORIES.map((cat) => {
-                    const currentForm = editingId !== null ? editForm : form;
-                    const setCurrentForm = editingId !== null ? setEditForm : setForm;
-                    const bd = currentForm.allocation_breakdown || {};
-                    return (
-                      <label key={cat}>
-                        {cat} %
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          max="100"
-                          value={bd[cat] ?? ""}
-                          onChange={(e) => {
-                            const val = e.target.value === "" ? 0 : Number(e.target.value);
-                            const updated = { ...bd, [cat]: val };
-                            // Remove zero entries to keep it clean
-                            const cleaned: Record<string, number> = {};
-                            for (const [k, v] of Object.entries(updated)) {
-                              if (v > 0) cleaned[k] = v;
-                            }
-                            setCurrentForm({ ...currentForm, allocation_breakdown: Object.keys(cleaned).length > 0 ? cleaned : null });
-                          }}
-                          placeholder="0"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                  Total: {Object.values((editingId !== null ? editForm : form).allocation_breakdown || {}).reduce((s, v) => s + v, 0)}%
-                </div>
-              </div>
-            )}
+            {editingId !== null
+              ? renderHoldingForm(editForm, setEditForm, true)
+              : renderHoldingForm(form, setForm, false)
+            }
             <div className="flex" style={{ marginTop: "0.5rem" }}>
               <button type="submit" className="btn-primary">
                 {editingId !== null ? "Save Changes" : "Add"}
@@ -496,7 +531,7 @@ export default function PortfolioDetail() {
                     setEditingId(null);
                   } else {
                     setShowForm(false);
-                    setForm({ ...emptyHolding });
+                    setForm({ ...emptyHolding, account_id: form.account_id });
                   }
                 }}
               >
@@ -506,7 +541,7 @@ export default function PortfolioDetail() {
           </form>
         )}
 
-        {portfolio.holdings.length === 0 ? (
+        {filteredHoldings.length === 0 ? (
           <div className="empty-state">No holdings yet.</div>
         ) : (
           <table>
@@ -514,6 +549,8 @@ export default function PortfolioDetail() {
               <tr>
                 <th>Name</th>
                 <th>Type</th>
+                <th>Sector</th>
+                <th>Geo</th>
                 <th>Qty</th>
                 <th>Price</th>
                 <th>Value</th>
@@ -522,7 +559,7 @@ export default function PortfolioDetail() {
               </tr>
             </thead>
             <tbody>
-              {portfolio.holdings.map((h) => (
+              {filteredHoldings.map((h) => (
                 <tr key={h.id} style={editingId === h.id ? { background: "var(--accent)", opacity: 0.15 } : undefined}>
                   <td>
                     {h.name}
@@ -540,10 +577,12 @@ export default function PortfolioDetail() {
                       </span>
                     )}
                   </td>
+                  <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{h.sector || "—"}</td>
+                  <td style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>{h.geography || "—"}</td>
                   <td>{h.quantity}</td>
                   <td>{h.price_per_unit.toLocaleString()} {h.currency}</td>
                   <td>{(h.quantity * h.price_per_unit).toLocaleString()} {h.currency}</td>
-                  <td style={{ color: "var(--text-muted)" }}>{h.account || "—"}</td>
+                  <td style={{ color: "var(--text-muted)" }}>{h.account_name || "—"}</td>
                   <td>
                     <div className="flex">
                       <button className="btn-ghost" onClick={() => { setShowForm(false); startEditing(h); }}>Edit</button>

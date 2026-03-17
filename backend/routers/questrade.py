@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Portfolio, Holding
+from ..models import Portfolio, Account, Holding
 from ..questrade_auth import exchange_token, get_status, clear_token
 from ..services.questrade import get_accounts, get_positions, get_symbols_batch
 
@@ -75,6 +75,31 @@ def list_accounts():
 
 # ── Sync endpoint ────────────────────────────────────────
 
+def _find_or_create_account(
+    db: Session, portfolio_id: int, account_number: str, account_type: str
+) -> Account:
+    """Find an existing Account by account_number or create one."""
+    existing = (
+        db.query(Account)
+        .filter_by(portfolio_id=portfolio_id, account_number=account_number)
+        .first()
+    )
+    if existing:
+        return existing
+
+    a = Account(
+        portfolio_id=portfolio_id,
+        name=account_type,
+        institution="Questrade",
+        account_type=account_type,
+        account_number=account_number,
+        currency="CAD",
+    )
+    db.add(a)
+    db.flush()
+    return a
+
+
 @router.post("/sync/{portfolio_id}", response_model=SyncResult)
 def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(get_db)):
     """Fetch Questrade positions and upsert them as holdings."""
@@ -93,6 +118,13 @@ def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(ge
     if body.account_numbers:
         accounts = [a for a in accounts if a["number"] in body.account_numbers]
 
+    # Find-or-create Account entities for each Questrade account
+    account_map: dict[str, Account] = {}
+    for acct in accounts:
+        account_map[acct["number"]] = _find_or_create_account(
+            db, portfolio_id, acct["number"], acct["type"]
+        )
+
     # Gather all positions across selected accounts
     all_positions = []
     for acct in accounts:
@@ -106,6 +138,7 @@ def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(ge
     all_positions = [p for p in all_positions if p.get("openQuantity", 0) > 0]
 
     if not all_positions:
+        db.commit()
         return SyncResult(added=0, updated=0, changes=[])
 
     # Batch-fetch symbol info for currency data
@@ -118,9 +151,10 @@ def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(ge
         except Exception:
             pass  # Fall back to no currency info
 
-    # Build existing holdings index by ticker
+    # Build existing holdings index by ticker (across all accounts in portfolio)
+    all_holdings = portfolio.holdings
     existing = {
-        h.ticker: h for h in portfolio.holdings if h.ticker
+        h.ticker: h for h in all_holdings if h.ticker
     }
 
     changes: list[SyncChange] = []
@@ -134,12 +168,14 @@ def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(ge
 
         quantity = pos.get("openQuantity", 0)
         price = pos.get("currentPrice", 0)
-        account_type = pos.get("_account_type", "")
+        account_number = pos.get("_account_number", "")
 
         # Determine currency from symbol info
         sym_info = symbols_data.get(pos.get("symbolId"))
         currency = sym_info.get("currency", "CAD") if sym_info else "CAD"
         symbol_name = sym_info.get("description", ticker) if sym_info else ticker
+
+        acct_entity = account_map.get(account_number)
 
         if ticker in existing:
             h = existing[ticker]
@@ -147,31 +183,32 @@ def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(ge
             h.quantity = quantity
             h.price_per_unit = price
             h.currency = currency
-            # Don't overwrite user-set asset_type or account
+            # Set account_id if still unset
+            if acct_entity:
+                h.account_id = acct_entity.id
             if old_qty != quantity or old_price != price:
                 updated += 1
                 changes.append(SyncChange(
                     ticker=ticker,
                     action="updated",
-                    details=f"qty: {old_qty}→{quantity}, price: {old_price}→{price}",
+                    details=f"qty: {old_qty}\u2192{quantity}, price: {old_price}\u2192{price}",
                 ))
         else:
             h = Holding(
-                portfolio_id=portfolio_id,
+                account_id=acct_entity.id if acct_entity else None,
                 name=symbol_name,
                 ticker=ticker,
                 asset_type="equity",
                 quantity=quantity,
                 price_per_unit=price,
                 currency=currency,
-                account=account_type,
             )
             db.add(h)
             added += 1
             changes.append(SyncChange(
                 ticker=ticker,
                 action="added",
-                details=f"qty: {quantity}, price: {price}, account: {account_type}",
+                details=f"qty: {quantity}, price: {price}, account: {pos.get('_account_type', '')}",
             ))
 
     db.commit()

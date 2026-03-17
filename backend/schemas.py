@@ -3,6 +3,47 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator, model_validator
 
 
+# ── Accounts ─────────────────────────────────────────────
+
+class AccountCreate(BaseModel):
+    name: str
+    institution: str | None = None
+    account_type: str | None = None
+    account_number: str | None = None
+    currency: str = "CAD"
+    cash_balance: float = 0.0
+
+
+class AccountUpdate(BaseModel):
+    name: str | None = None
+    institution: str | None = None
+    account_type: str | None = None
+    account_number: str | None = None
+    currency: str | None = None
+    cash_balance: float | None = None
+
+
+class AccountOut(BaseModel):
+    id: int
+    portfolio_id: int
+    name: str
+    institution: str | None
+    account_type: str | None
+    account_number: str | None
+    currency: str
+    cash_balance: float
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AccountWithStats(AccountOut):
+    holding_count: int = 0
+    total_value: float = 0.0
+    total_value_base: float = 0.0
+
+
 # ── Holdings ──────────────────────────────────────────────
 
 class HoldingCreate(BaseModel):
@@ -12,7 +53,9 @@ class HoldingCreate(BaseModel):
     quantity: float
     price_per_unit: float
     currency: str = "CAD"
-    account: str | None = None
+    account_id: int
+    sector: str | None = None
+    geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
 
     @model_validator(mode="after")
@@ -33,7 +76,9 @@ class HoldingUpdate(BaseModel):
     quantity: float | None = None
     price_per_unit: float | None = None
     currency: str | None = None
-    account: str | None = None
+    account_id: int | None = None
+    sector: str | None = None
+    geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
 
     @model_validator(mode="after")
@@ -47,14 +92,16 @@ class HoldingUpdate(BaseModel):
 
 class HoldingOut(BaseModel):
     id: int
-    portfolio_id: int
+    account_id: int
+    account_name: str = ""
     name: str
     ticker: str | None
     asset_type: str
     quantity: float
     price_per_unit: float
     currency: str
-    account: str | None
+    sector: str | None = None
+    geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
     created_at: datetime
     updated_at: datetime
@@ -75,6 +122,7 @@ class HoldingOut(BaseModel):
 class TargetItem(BaseModel):
     category: str
     target_pct: float
+    dimension: str = "asset_type"
 
 
 class TargetOut(BaseModel):
@@ -82,6 +130,7 @@ class TargetOut(BaseModel):
     portfolio_id: int
     category: str
     target_pct: float
+    dimension: str = "asset_type"
 
     model_config = {"from_attributes": True}
 
@@ -117,6 +166,7 @@ class PortfolioOut(BaseModel):
 class PortfolioDetail(PortfolioOut):
     holdings: list[HoldingOut]
     targets: list[TargetOut]
+    accounts: list[AccountOut]
 
 
 # ── Rebalance ─────────────────────────────────────────────

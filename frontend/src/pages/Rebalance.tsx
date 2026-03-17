@@ -1,55 +1,101 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { Portfolio, RebalanceResult, TargetInput } from "../types";
+import type { PortfolioDetail, RebalanceResult, TargetInput } from "../types";
 import { getPortfolio, getRebalance, setTargets, getTargets } from "../api";
 
-const CATEGORIES = ["equity", "bond", "crypto", "cash"] as const;
+const DIMENSIONS = ["asset_type", "sector", "geography"] as const;
+const DIMENSION_LABELS: Record<string, string> = { asset_type: "Asset Type", sector: "Sector", geography: "Geography" };
 
 const BAR_COLORS: Record<string, string> = {
   equity: "var(--accent)",
   bond: "var(--blue)",
   crypto: "var(--yellow)",
   cash: "var(--green)",
+  commodity: "var(--orange)",
 };
+
+function getCategoriesForDimension(holdings: PortfolioDetail["holdings"], dimension: string, hasCash: boolean): string[] {
+  const cats = new Set<string>();
+  for (const h of holdings) {
+    if (dimension === "asset_type") {
+      if (h.allocation_breakdown) {
+        for (const k of Object.keys(h.allocation_breakdown)) cats.add(k);
+      } else {
+        cats.add(h.asset_type);
+      }
+    } else if (dimension === "sector") {
+      cats.add(h.sector || "unclassified");
+    } else if (dimension === "geography") {
+      cats.add(h.geography || "unclassified");
+    }
+  }
+  // Include "cash" if accounts have cash balance and dimension is asset_type
+  if (dimension === "asset_type" && hasCash) {
+    cats.add("cash");
+  }
+  return Array.from(cats).sort();
+}
 
 export default function Rebalance() {
   const { id } = useParams<{ id: string }>();
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [portfolio, setPortfolio] = useState<PortfolioDetail | null>(null);
+  const [dimension, setDimension] = useState<string>("asset_type");
   const [result, setResult] = useState<RebalanceResult | null>(null);
-  const [targetForm, setTargetForm] = useState<Record<string, number>>({
-    equity: 0,
-    bond: 0,
-    crypto: 0,
-    cash: 0,
-  });
+  const [targetForm, setTargetForm] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
+  const [filterAccountId, setFilterAccountId] = useState<number | undefined>(undefined);
+
+  const loadDimension = async (dim: string, accountId?: number) => {
+    if (!id) return;
+    const existing = await getTargets(Number(id), dim);
+    const map: Record<string, number> = {};
+    existing.forEach((t) => { map[t.category] = t.target_pct; });
+    setTargetForm(map);
+
+    const r = await getRebalance(Number(id), dim, accountId);
+    setResult(r);
+  };
 
   const load = async () => {
     if (!id) return;
     const p = await getPortfolio(Number(id));
     setPortfolio(p);
-
-    const existing = await getTargets(Number(id));
-    if (existing.length > 0) {
-      const map: Record<string, number> = { equity: 0, bond: 0, crypto: 0, cash: 0 };
-      existing.forEach((t) => { map[t.category] = t.target_pct; });
-      setTargetForm(map);
-    }
-
-    const r = await getRebalance(Number(id));
-    setResult(r);
+    await loadDimension(dimension, filterAccountId);
   };
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    if (portfolio) loadDimension(dimension, filterAccountId);
+  }, [dimension, filterAccountId]);
+
+  const hasCash = portfolio
+    ? portfolio.accounts.some((a) => a.cash_balance > 0)
+    : false;
+
+  const categories = portfolio ? getCategoriesForDimension(portfolio.holdings, dimension, hasCash) : [];
+
+  // Ensure all categories from holdings appear in target form
+  const mergedForm: Record<string, number> = {};
+  for (const cat of categories) {
+    mergedForm[cat] = targetForm[cat] ?? 0;
+  }
+  // Also keep any target categories not in current holdings
+  for (const [k, v] of Object.entries(targetForm)) {
+    if (!(k in mergedForm)) mergedForm[k] = v;
+  }
 
   const handleSaveTargets = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    const items: TargetInput[] = CATEGORIES.map((c) => ({
-      category: c,
-      target_pct: targetForm[c] || 0,
-    }));
+    const items: TargetInput[] = Object.entries(mergedForm)
+      .filter(([, v]) => v > 0)
+      .map(([category, target_pct]) => ({
+        category,
+        target_pct,
+        dimension,
+      }));
 
     const total = items.reduce((s, t) => s + t.target_pct, 0);
     if (Math.abs(total - 100) > 0.01) {
@@ -58,11 +104,11 @@ export default function Rebalance() {
     }
 
     await setTargets(Number(id), items);
-    const r = await getRebalance(Number(id));
+    const r = await getRebalance(Number(id), dimension, filterAccountId);
     setResult(r);
   };
 
-  const totalPct = Object.values(targetForm).reduce((s, v) => s + v, 0);
+  const totalPct = Object.values(mergedForm).reduce((s, v) => s + v, 0);
 
   if (!portfolio) return <div>Loading...</div>;
 
@@ -76,12 +122,38 @@ export default function Rebalance() {
         <h1 style={{ marginBottom: 0 }}>Rebalance: {portfolio.name}</h1>
       </div>
 
+      {/* Filters */}
+      <div className="flex" style={{ marginBottom: "1.5rem", gap: "1rem" }}>
+        <div className="dimension-tabs">
+          {DIMENSIONS.map((d) => (
+            <button
+              key={d}
+              className={`dimension-tab${dimension === d ? " active" : ""}`}
+              onClick={() => setDimension(d)}
+            >
+              {DIMENSION_LABELS[d]}
+            </button>
+          ))}
+        </div>
+        <div className="filter-bar">
+          <select
+            value={filterAccountId ?? ""}
+            onChange={(e) => setFilterAccountId(e.target.value ? Number(e.target.value) : undefined)}
+          >
+            <option value="">All Accounts</option>
+            {portfolio.accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Target Allocation Form */}
       <div className="card">
-        <h2>Target Allocation</h2>
+        <h2>Target Allocation — {DIMENSION_LABELS[dimension]}</h2>
         <form onSubmit={handleSaveTargets}>
           <div className="grid-form">
-            {CATEGORIES.map((cat) => (
+            {Object.keys(mergedForm).sort().map((cat) => (
               <label key={cat}>
                 <span style={{ textTransform: "capitalize" }}>{cat}</span>
                 <div className="flex">
@@ -90,7 +162,7 @@ export default function Rebalance() {
                     step="0.1"
                     min="0"
                     max="100"
-                    value={targetForm[cat] || ""}
+                    value={mergedForm[cat] || ""}
                     onChange={(e) =>
                       setTargetForm({ ...targetForm, [cat]: Number(e.target.value) })
                     }
@@ -143,7 +215,6 @@ export default function Rebalance() {
                   </span>
                 </div>
                 <div className="bar-track">
-                  {/* Current allocation bar */}
                   <div
                     className="bar-fill"
                     style={{
@@ -153,7 +224,6 @@ export default function Rebalance() {
                       position: "absolute",
                     }}
                   />
-                  {/* Target marker */}
                   <div
                     style={{
                       position: "absolute",

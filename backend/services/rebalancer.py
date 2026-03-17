@@ -30,17 +30,30 @@ def compute_rebalance(
     portfolio: Portfolio,
     holdings: list[Holding],
     targets: list[AllocationTarget],
+    dimension: str = "asset_type",
+    cash_from_accounts: float = 0.0,
 ) -> RebalanceResult:
-    # Sum values by asset_type in base currency
+    # Sum values by the selected dimension in base currency
     by_category: dict[str, float] = {}
     for h in holdings:
         val = _to_base(h, portfolio)
-        if h.allocation_breakdown:
-            breakdown = json.loads(h.allocation_breakdown) if isinstance(h.allocation_breakdown, str) else h.allocation_breakdown
-            for cat, pct in breakdown.items():
-                by_category[cat] = by_category.get(cat, 0.0) + val * (pct / 100)
-        else:
-            by_category[h.asset_type] = by_category.get(h.asset_type, 0.0) + val
+        if dimension == "asset_type":
+            if h.allocation_breakdown:
+                breakdown = json.loads(h.allocation_breakdown) if isinstance(h.allocation_breakdown, str) else h.allocation_breakdown
+                for cat, pct in breakdown.items():
+                    by_category[cat] = by_category.get(cat, 0.0) + val * (pct / 100)
+            else:
+                by_category[h.asset_type] = by_category.get(h.asset_type, 0.0) + val
+        elif dimension == "sector":
+            key = h.sector or "unclassified"
+            by_category[key] = by_category.get(key, 0.0) + val
+        elif dimension == "geography":
+            key = h.geography or "unclassified"
+            by_category[key] = by_category.get(key, 0.0) + val
+
+    # Add account cash to "cash" category for asset_type dimension
+    if dimension == "asset_type" and cash_from_accounts > 0:
+        by_category["cash"] = by_category.get("cash", 0.0) + cash_from_accounts
 
     total = sum(by_category.values())
 

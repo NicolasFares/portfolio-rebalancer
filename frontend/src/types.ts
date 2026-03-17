@@ -8,16 +8,46 @@ export interface Portfolio {
   updated_at: string;
 }
 
-export interface Holding {
+export interface Account {
   id: number;
   portfolio_id: number;
+  name: string;
+  institution: string | null;
+  account_type: string | null;
+  account_number: string | null;
+  currency: string;
+  cash_balance: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountWithStats extends Account {
+  holding_count: number;
+  total_value: number;
+  total_value_base: number;
+}
+
+export interface AccountInput {
+  name: string;
+  institution?: string;
+  account_type?: string;
+  account_number?: string;
+  currency?: string;
+  cash_balance?: number;
+}
+
+export interface Holding {
+  id: number;
+  account_id: number;
+  account_name: string;
   name: string;
   ticker: string | null;
   asset_type: string;
   quantity: number;
   price_per_unit: number;
   currency: string;
-  account: string | null;
+  sector: string | null;
+  geography: string | null;
   allocation_breakdown: Record<string, number> | null;
   created_at: string;
   updated_at: string;
@@ -28,16 +58,19 @@ export interface Target {
   portfolio_id: number;
   category: string;
   target_pct: number;
+  dimension: string;
 }
 
 export interface TargetInput {
   category: string;
   target_pct: number;
+  dimension: string;
 }
 
 export interface PortfolioDetail extends Portfolio {
   holdings: Holding[];
   targets: Target[];
+  accounts: Account[];
 }
 
 export interface RebalanceSuggestion {
@@ -62,7 +95,9 @@ export interface HoldingInput {
   quantity: number;
   price_per_unit: number;
   currency: string;
-  account?: string;
+  account_id: number;
+  sector?: string;
+  geography?: string;
   allocation_breakdown?: Record<string, number> | null;
 }
 

@@ -19,6 +19,7 @@
   --red: #ff6b6b;
   --yellow: #ffd93d;
   --blue: #74b9ff;
+  --orange: #e17055;
   --radius: 8px;
   --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -184,6 +185,7 @@ tr:hover {
 .tag-bond { background: rgba(116, 185, 255, 0.15); color: var(--blue); }
 .tag-crypto { background: rgba(255, 217, 61, 0.15); color: var(--yellow); }
 .tag-cash { background: rgba(0, 184, 148, 0.15); color: var(--green); }
+.tag-commodity { background: rgba(225, 112, 85, 0.15); color: var(--orange); }
 
 .bar-chart {
   display: flex;
@@ -235,8 +237,67 @@ tr:hover {
   border-bottom: 1px solid var(--border);
 }
 
+.dimension-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.dimension-tab {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.75rem;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dimension-tab:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.dimension-tab.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
 .empty-state {
   text-align: center;
   padding: 3rem;
   color: var(--text-muted);
+}
+
+.account-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.account-stats {
+  display: flex;
+  gap: 2rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.account-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.account-stats-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.filter-bar select {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
 }

@@ -10,9 +10,12 @@ import type {
   QuestradeStatus,
   QuestradeAccount,
   SyncResult,
+  AccountWithStats,
+  AccountInput,
+  Account,
 } from "./types";
 
-const BASE = "http://localhost:8001/api";
+const BASE = "http://localhost:8000/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -42,6 +45,22 @@ export const updatePortfolio = (id: number, data: Partial<PortfolioInput>) =>
 export const deletePortfolio = (id: number) =>
   request<void>(`/portfolios/${id}`, { method: "DELETE" });
 
+// Accounts
+export const listAccounts = (portfolioId: number) =>
+  request<AccountWithStats[]>(`/portfolios/${portfolioId}/accounts`);
+
+export const createAccount = (portfolioId: number, data: AccountInput) =>
+  request<Account>(`/portfolios/${portfolioId}/accounts`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+export const updateAccount = (id: number, data: Partial<AccountInput>) =>
+  request<Account>(`/accounts/${id}`, { method: "PUT", body: JSON.stringify(data) });
+
+export const deleteAccount = (id: number) =>
+  request<void>(`/accounts/${id}`, { method: "DELETE" });
+
 // Holdings
 export const addHolding = (portfolioId: number, data: HoldingInput) =>
   request<Holding>(`/portfolios/${portfolioId}/holdings`, {
@@ -50,14 +69,14 @@ export const addHolding = (portfolioId: number, data: HoldingInput) =>
   });
 
 export const updateHolding = (id: number, data: Partial<HoldingInput>) =>
-  request<Holding>(`/holdings/${id}`, { method: "PUT", body: JSON.stringify(data) });  // note: /api prefix added by BASE, but holdings route is /api/holdings/{id}
+  request<Holding>(`/holdings/${id}`, { method: "PUT", body: JSON.stringify(data) });
 
 export const deleteHolding = (id: number) =>
   request<void>(`/holdings/${id}`, { method: "DELETE" });
 
 // Targets
-export const getTargets = (portfolioId: number) =>
-  request<Target[]>(`/portfolios/${portfolioId}/targets`);
+export const getTargets = (portfolioId: number, dimension?: string) =>
+  request<Target[]>(`/portfolios/${portfolioId}/targets${dimension ? `?dimension=${dimension}` : ""}`);
 
 export const setTargets = (portfolioId: number, data: TargetInput[]) =>
   request<Target[]>(`/portfolios/${portfolioId}/targets`, {
@@ -66,8 +85,13 @@ export const setTargets = (portfolioId: number, data: TargetInput[]) =>
   });
 
 // Rebalance
-export const getRebalance = (portfolioId: number) =>
-  request<RebalanceResult>(`/portfolios/${portfolioId}/rebalance`);
+export const getRebalance = (portfolioId: number, dimension?: string, accountId?: number) => {
+  const params = new URLSearchParams();
+  if (dimension) params.set("dimension", dimension);
+  if (accountId !== undefined) params.set("account_id", String(accountId));
+  const qs = params.toString();
+  return request<RebalanceResult>(`/portfolios/${portfolioId}/rebalance${qs ? `?${qs}` : ""}`);
+};
 
 // Questrade
 export const questradeAuth = (refreshToken: string) =>
