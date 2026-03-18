@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import { Plus, MoreHorizontal, Pencil, Trash2, PackageOpen, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import type { PortfolioDetail as PDetail, HoldingInput } from "@/lib/types";
 import {
   getPortfolio,
@@ -11,6 +12,7 @@ import {
   updateHolding,
   updatePortfolio,
 } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,9 +30,42 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { AllocationChart } from "@/components/allocation-chart";
-import { HoldingForm } from "@/components/holding-form";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
+import { DonutChart } from "@/components/donut-chart";
+import { HoldingDialog } from "@/components/holding-dialog";
 import { QuestradePanel } from "@/components/questrade-panel";
+import { PortfolioNav } from "@/components/portfolio-nav";
+import { StatCard } from "@/components/stat-card";
+import { EmptyState } from "@/components/empty-state";
+import { PortfolioDetailSkeleton } from "@/components/page-skeleton";
 
 const DIMENSIONS = ["asset_type", "sector", "geography"] as const;
 const DIMENSION_LABELS: Record<string, string> = {
@@ -55,16 +90,15 @@ export default function PortfolioDetail() {
   const { id } = useParams<{ id: string }>();
   const [portfolio, setPortfolio] = useState<PDetail | null>(null);
   const [form, setForm] = useState<HoldingInput>({ ...emptyHolding });
-  const [showForm, setShowForm] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<HoldingInput>({ ...emptyHolding });
   const [editingRates, setEditingRates] = useState(false);
   const [eurRate, setEurRate] = useState(0);
   const [usdRate, setUsdRate] = useState(0);
   const [chartDimension, setChartDimension] = useState<string>("asset_type");
-  const [filterAccountId, setFilterAccountId] = useState<number | undefined>(
-    undefined,
-  );
+  const [filterAccountId, setFilterAccountId] = useState<string>("all");
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const load = () => {
     if (!id) return;
@@ -83,11 +117,11 @@ export default function PortfolioDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (!portfolio) return <div className="text-muted-foreground">Loading...</div>;
+  if (!portfolio) return <PortfolioDetailSkeleton />;
 
   const filteredHoldings =
-    filterAccountId !== undefined
-      ? portfolio.holdings.filter((h) => h.account_id === filterAccountId)
+    filterAccountId !== "all"
+      ? portfolio.holdings.filter((h) => h.account_id === Number(filterAccountId))
       : portfolio.holdings;
 
   const toBase = (val: number, currency: string) => {
@@ -134,16 +168,21 @@ export default function PortfolioDetail() {
   };
   const byType = computeByDimension(chartDimension);
 
+  const fmt = (n: number) => formatCurrency(n, portfolio.base_currency);
+
   const handleAddHolding = async (e: React.FormEvent) => {
     e.preventDefault();
     await addHolding(Number(id), form);
     setForm({ ...emptyHolding, account_id: form.account_id });
-    setShowForm(false);
+    setAddOpen(false);
+    toast.success("Holding added");
     load();
   };
 
   const handleDeleteHolding = async (holdingId: number) => {
     await deleteHolding(holdingId);
+    setDeleteId(null);
+    toast.success("Holding deleted");
     load();
   };
 
@@ -168,6 +207,7 @@ export default function PortfolioDetail() {
     if (editingId === null) return;
     await updateHolding(editingId, editForm);
     setEditingId(null);
+    toast.success("Holding updated");
     load();
   };
 
@@ -177,99 +217,28 @@ export default function PortfolioDetail() {
       usd_to_base: usdRate,
     });
     setEditingRates(false);
+    toast.success("Exchange rates updated");
     load();
   };
 
-  const fmt = (n: number) =>
-    n.toLocaleString("en-CA", {
-      style: "currency",
-      currency: portfolio.base_currency,
-    });
-
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="mb-1 text-2xl font-bold">{portfolio.name}</h1>
-          <span className="text-sm text-muted-foreground">
-            Total: {fmt(totalValue)} {portfolio.base_currency}
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href={`/portfolio/${id}/accounts`}>
-            <Button variant="ghost">Accounts</Button>
-          </Link>
-          <Link href={`/portfolio/${id}/rebalance`}>
-            <Button>Rebalance</Button>
-          </Link>
-        </div>
+      {/* Sub-navigation with breadcrumb */}
+      <div className="animate-fade-in-up stagger-1">
+        <PortfolioNav portfolioId={id} portfolioName={portfolio.name} />
       </div>
 
-      {/* Questrade Sync */}
-      <QuestradePanel portfolioId={Number(id)} onSyncComplete={load} />
-
-      {/* Exchange Rates */}
-      <Card className="mt-4">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Exchange Rates</CardTitle>
-            {!editingRates ? (
-              <Button variant="ghost" onClick={() => setEditingRates(true)}>
-                Edit
-              </Button>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Button onClick={handleSaveRates}>Save</Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => setEditingRates(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">1 EUR =</span>
-            {editingRates ? (
-              <Input
-                type="number"
-                step="0.01"
-                value={eurRate}
-                onChange={(e) => setEurRate(Number(e.target.value))}
-                className="w-24"
-              />
-            ) : (
-              <span>{portfolio.eur_to_base}</span>
-            )}
-            <span className="text-sm text-muted-foreground">
-              {portfolio.base_currency}
-            </span>
-            <span className="mx-2 text-border">|</span>
-            <span className="text-sm text-muted-foreground">1 USD =</span>
-            {editingRates ? (
-              <Input
-                type="number"
-                step="0.01"
-                value={usdRate}
-                onChange={(e) => setUsdRate(Number(e.target.value))}
-                className="w-24"
-              />
-            ) : (
-              <span>{portfolio.usd_to_base}</span>
-            )}
-            <span className="text-sm text-muted-foreground">
-              {portfolio.base_currency}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Stat Cards Grid */}
+      <div className="animate-fade-in-up stagger-2 mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total Value" value={fmt(totalValue)} subtitle={portfolio.base_currency} size="lg" />
+        <StatCard label="Holdings" value={String(portfolio.holdings.length)} />
+        <StatCard label="Accounts" value={String(portfolio.accounts.length)} />
+        <StatCard label="Cash Balance" value={fmt(accountCashValue)} />
+      </div>
 
       {/* Allocation Chart */}
       {Object.keys(byType).length > 0 && (
-        <Card className="mt-4">
+        <Card className="animate-fade-in-up stagger-3 mt-4">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Current Allocation</CardTitle>
@@ -288,104 +257,53 @@ export default function PortfolioDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            <AllocationChart data={byType} totalValue={totalValue} />
+            <DonutChart data={byType} totalValue={totalValue} currency={portfolio.base_currency} />
           </CardContent>
         </Card>
       )}
 
       {/* Holdings Table */}
-      <Card className="mt-4">
+      <Card className="animate-fade-in-up stagger-4 mt-4">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Holdings ({filteredHoldings.length})</CardTitle>
             <div className="flex items-center gap-3">
-              <select
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                value={filterAccountId ?? ""}
-                onChange={(e) =>
-                  setFilterAccountId(
-                    e.target.value ? Number(e.target.value) : undefined,
-                  )
-                }
-              >
-                <option value="">All Accounts</option>
-                {portfolio.accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              {editingId === null && (
-                <Button onClick={() => setShowForm(!showForm)}>
-                  {showForm ? "Cancel" : "Add Holding"}
-                </Button>
-              )}
+              <Select value={filterAccountId} onValueChange={(val) => val && setFilterAccountId(val)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Accounts</SelectItem>
+                  {portfolio.accounts.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={() => setAddOpen(true)}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add Holding
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {(showForm || editingId !== null) && (
-            <form
-              onSubmit={
-                editingId !== null ? handleUpdateHolding : handleAddHolding
-              }
-              className="mb-4 rounded-md border border-border bg-secondary p-4"
-            >
-              <p
-                className={`mb-3 text-sm font-semibold ${editingId !== null ? "text-primary" : ""}`}
-              >
-                {editingId !== null ? "Editing holding" : "New holding"}
-              </p>
-              {editingId !== null ? (
-                <HoldingForm
-                  form={editForm}
-                  setForm={setEditForm}
-                  accounts={portfolio.accounts}
-                />
-              ) : (
-                <HoldingForm
-                  form={form}
-                  setForm={setForm}
-                  accounts={portfolio.accounts}
-                />
-              )}
-              <div className="mt-2 flex items-center gap-3">
-                <Button type="submit">
-                  {editingId !== null ? "Save Changes" : "Add"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    if (editingId !== null) {
-                      setEditingId(null);
-                    } else {
-                      setShowForm(false);
-                      setForm({
-                        ...emptyHolding,
-                        account_id: form.account_id,
-                      });
-                    }
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          )}
-
           {filteredHoldings.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              No holdings yet.
-            </div>
+            <EmptyState
+              icon={PackageOpen}
+              title="No holdings yet"
+              description="Add your first holding to start tracking."
+              action={{ label: "Add Holding", onClick: () => setAddOpen(true) }}
+            />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Sector</TableHead>
-                  <TableHead>Geo</TableHead>
+                  <TableHead className="hidden lg:table-cell">Sector</TableHead>
+                  <TableHead className="hidden lg:table-cell">Geo</TableHead>
                   <TableHead>Qty</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Value</TableHead>
@@ -395,12 +313,7 @@ export default function PortfolioDetail() {
               </TableHeader>
               <TableBody>
                 {filteredHoldings.map((h) => (
-                  <TableRow
-                    key={h.id}
-                    className={
-                      editingId === h.id ? "opacity-30" : undefined
-                    }
-                  >
+                  <TableRow key={h.id}>
                     <TableCell>
                       {h.name}
                       {h.ticker && (
@@ -419,17 +332,17 @@ export default function PortfolioDetail() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                       {h.sector || "—"}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">
                       {h.geography || "—"}
                     </TableCell>
-                    <TableCell>{h.quantity}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-tabular">{h.quantity}</TableCell>
+                    <TableCell className="font-tabular">
                       {h.price_per_unit.toLocaleString()} {h.currency}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="font-tabular">
                       {(h.quantity * h.price_per_unit).toLocaleString()}{" "}
                       {h.currency}
                     </TableCell>
@@ -437,25 +350,29 @@ export default function PortfolioDetail() {
                       {h.account_name || "—"}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setShowForm(false);
-                            startEditing(h);
-                          }}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={<Button variant="ghost" size="sm" />}
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteHolding(h.id)}
-                        >
-                          ✕
-                        </Button>
-                      </div>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => startEditing(h)}
+                          >
+                            <Pencil className="mr-2 h-3.5 w-3.5" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteId(h.id)}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -464,6 +381,115 @@ export default function PortfolioDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Holding Dialog */}
+      <HoldingDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        mode="add"
+        form={form}
+        setForm={setForm}
+        accounts={portfolio.accounts}
+        onSubmit={handleAddHolding}
+      />
+
+      {/* Edit Holding Dialog */}
+      <HoldingDialog
+        open={editingId !== null}
+        onOpenChange={(open) => { if (!open) setEditingId(null); }}
+        mode="edit"
+        form={editForm}
+        setForm={setEditForm}
+        accounts={portfolio.accounts}
+        onSubmit={handleUpdateHolding}
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete holding?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this holding from your portfolio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && handleDeleteHolding(deleteId)}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Exchange Rates — Collapsible */}
+      <div className="animate-fade-in-up stagger-5 mt-4">
+        <Collapsible defaultOpen={false}>
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-sm transition-colors hover:bg-accent">
+            <div className="flex items-center gap-3">
+              <span className="font-medium">Exchange Rates</span>
+              <span className="font-tabular text-xs text-muted-foreground">
+                1 EUR = {portfolio.eur_to_base} {portfolio.base_currency} · 1 USD = {portfolio.usd_to_base} {portfolio.base_currency}
+              </span>
+            </div>
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform [[data-panel-open]_&]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <Card className="mt-2">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3 font-tabular">
+                  <span className="text-sm text-muted-foreground">1 EUR =</span>
+                  {editingRates ? (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={eurRate}
+                      onChange={(e) => setEurRate(Number(e.target.value))}
+                      className="w-24"
+                    />
+                  ) : (
+                    <span>{portfolio.eur_to_base}</span>
+                  )}
+                  <span className="text-sm text-muted-foreground">
+                    {portfolio.base_currency}
+                  </span>
+                  <span className="mx-2 text-border">|</span>
+                  <span className="text-sm text-muted-foreground">1 USD =</span>
+                  {editingRates ? (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={usdRate}
+                      onChange={(e) => setUsdRate(Number(e.target.value))}
+                      className="w-24"
+                    />
+                  ) : (
+                    <span>{portfolio.usd_to_base}</span>
+                  )}
+                  <span className="text-sm text-muted-foreground">
+                    {portfolio.base_currency}
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    {editingRates ? (
+                      <>
+                        <Button size="sm" onClick={handleSaveRates}>Save</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingRates(false)}>Cancel</Button>
+                      </>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => setEditingRates(true)}>Edit</Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      {/* Questrade Sync — Collapsible */}
+      <div className="animate-fade-in-up stagger-5 mt-4">
+        <QuestradePanel portfolioId={Number(id)} onSyncComplete={load} />
+      </div>
     </div>
   );
 }

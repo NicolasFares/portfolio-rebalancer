@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import { Plus, Wallet, Pencil } from "lucide-react";
+import { toast } from "sonner";
 import type { AccountWithStats, AccountInput } from "@/lib/types";
 import {
   listAccounts,
@@ -11,10 +12,10 @@ import {
   deleteAccount,
   getPortfolio,
 } from "@/lib/api";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,8 +27,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-const CURRENCIES = ["CAD", "EUR", "USD"] as const;
+import { PortfolioNav } from "@/components/portfolio-nav";
+import { AccountDialog } from "@/components/account-dialog";
+import { StatCard } from "@/components/stat-card";
+import { EmptyState } from "@/components/empty-state";
+import { AccountsSkeleton } from "@/components/page-skeleton";
 
 const emptyAccount: AccountInput = {
   name: "",
@@ -43,7 +47,8 @@ export default function AccountList() {
   const [accounts, setAccounts] = useState<AccountWithStats[]>([]);
   const [portfolioName, setPortfolioName] = useState("");
   const [baseCurrency, setBaseCurrency] = useState("CAD");
-  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState<AccountInput>({ ...emptyAccount });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<AccountInput>({ ...emptyAccount });
@@ -57,6 +62,7 @@ export default function AccountList() {
     setAccounts(accts);
     setPortfolioName(portfolio.name);
     setBaseCurrency(portfolio.base_currency);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -68,7 +74,8 @@ export default function AccountList() {
     e.preventDefault();
     await createAccount(Number(id), form);
     setForm({ ...emptyAccount });
-    setShowForm(false);
+    setAddOpen(false);
+    toast.success("Account created");
     load();
   };
 
@@ -77,11 +84,13 @@ export default function AccountList() {
     if (editingId === null) return;
     await updateAccount(editingId, editForm);
     setEditingId(null);
+    toast.success("Account updated");
     load();
   };
 
   const handleDelete = async (accountId: number) => {
     await deleteAccount(accountId);
+    toast.success("Account deleted");
     load();
   };
 
@@ -97,150 +106,59 @@ export default function AccountList() {
     });
   };
 
-  const fmtCur = (n: number, currency: string) =>
-    n.toLocaleString("en-CA", { style: "currency", currency });
-
-  const renderForm = (
-    currentForm: AccountInput,
-    setCurrentForm: (f: AccountInput) => void,
-    onSubmit: (e: React.FormEvent) => void,
-    isEdit: boolean,
-  ) => (
-    <form
-      onSubmit={onSubmit}
-      className="mb-4 rounded-md border border-border bg-secondary p-4"
-    >
-      <p
-        className={`mb-3 text-sm font-semibold ${isEdit ? "text-primary" : ""}`}
-      >
-        {isEdit ? "Edit Account" : "New Account"}
-      </p>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Name</Label>
-          <Input
-            required
-            value={currentForm.name}
-            onChange={(e) =>
-              setCurrentForm({ ...currentForm, name: e.target.value })
-            }
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Institution</Label>
-          <Input
-            value={currentForm.institution || ""}
-            onChange={(e) =>
-              setCurrentForm({ ...currentForm, institution: e.target.value })
-            }
-            placeholder="e.g. Questrade"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Account Type</Label>
-          <Input
-            value={currentForm.account_type || ""}
-            onChange={(e) =>
-              setCurrentForm({ ...currentForm, account_type: e.target.value })
-            }
-            placeholder="e.g. TFSA"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">
-            Account Number
-          </Label>
-          <Input
-            value={currentForm.account_number || ""}
-            onChange={(e) =>
-              setCurrentForm({
-                ...currentForm,
-                account_number: e.target.value,
-              })
-            }
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Currency</Label>
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={currentForm.currency}
-            onChange={(e) =>
-              setCurrentForm({ ...currentForm, currency: e.target.value })
-            }
-          >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Cash Balance</Label>
-          <Input
-            type="number"
-            step="any"
-            value={currentForm.cash_balance || ""}
-            onChange={(e) =>
-              setCurrentForm({
-                ...currentForm,
-                cash_balance: Number(e.target.value),
-              })
-            }
-          />
-        </div>
-      </div>
-      <div className="mt-2 flex items-center gap-3">
-        <Button type="submit">{isEdit ? "Save" : "Add"}</Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            if (isEdit) setEditingId(null);
-            else setShowForm(false);
-          }}
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
+  if (loading) return <AccountsSkeleton />;
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/portfolio/${id}`}
-            className="text-primary hover:text-primary/80"
-          >
-            ← Back to Portfolio
-          </Link>
-          <h1 className="text-2xl font-bold">Accounts ({accounts.length})</h1>
-        </div>
-        {editingId === null && (
-          <Button onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Cancel" : "+ Add Account"}
-          </Button>
-        )}
+      <div className="animate-fade-in-up stagger-1 mb-6 flex items-center justify-between">
+        <h1 className="font-serif text-3xl">Accounts ({accounts.length})</h1>
+        <Button onClick={() => setAddOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" />
+          Add Account
+        </Button>
       </div>
 
-      {showForm && renderForm(form, setForm, handleAdd, false)}
-      {editingId !== null && renderForm(editForm, setEditForm, handleUpdate, true)}
+      <PortfolioNav portfolioId={id} portfolioName={portfolioName} />
+
+      <AccountDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        mode="add"
+        form={form}
+        setForm={setForm}
+        onSubmit={handleAdd}
+      />
+
+      <AccountDialog
+        open={editingId !== null}
+        onOpenChange={(open) => { if (!open) setEditingId(null); }}
+        mode="edit"
+        form={editForm}
+        setForm={setEditForm}
+        onSubmit={handleUpdate}
+      />
 
       {accounts.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          No accounts yet.
-        </div>
+        <EmptyState
+          icon={Wallet}
+          title="No accounts yet"
+          description="Add an account to organize your holdings."
+          action={{ label: "Add Account", onClick: () => setAddOpen(true) }}
+        />
       ) : (
-        accounts.map((a) => (
-          <Card key={a.id} className="mb-4">
+        accounts.map((a, i) => (
+          <Card
+            key={a.id}
+            className={`animate-fade-in-up stagger-${Math.min(i + 2, 5)} hover-card mb-4`}
+          >
             <CardContent className="pt-6">
-              <div className="mb-2 flex items-center justify-between">
-                <div>
-                  <strong className="text-lg">{a.name}</strong>
-                  <span className="ml-3 text-sm text-muted-foreground">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <strong className="font-serif text-lg">{a.name}</strong>
+                  {a.account_type && (
+                    <Badge variant="secondary">{a.account_type}</Badge>
+                  )}
+                  <span className="text-sm text-muted-foreground">
                     {a.institution ? `${a.institution} · ` : ""}
                     {a.currency}
                   </span>
@@ -249,11 +167,9 @@ export default function AccountList() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      setShowForm(false);
-                      startEditing(a);
-                    }}
+                    onClick={() => startEditing(a)}
                   >
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
                     Edit
                   </Button>
                   <AlertDialog>
@@ -280,35 +196,28 @@ export default function AccountList() {
                   </AlertDialog>
                 </div>
               </div>
-              <div className="flex gap-8 text-sm">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Cash
-                  </span>
-                  <span>{fmtCur(a.cash_balance, a.currency)}</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Holdings
-                  </span>
-                  <span>
-                    {a.holding_count} holding
-                    {a.holding_count !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Total
-                  </span>
-                  <span>{fmtCur(a.total_value, a.currency)}</span>
-                </div>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <StatCard
+                  size="sm"
+                  label="Cash"
+                  value={formatCurrency(a.cash_balance, a.currency)}
+                />
+                <StatCard
+                  size="sm"
+                  label="Holdings"
+                  value={`${a.holding_count} holding${a.holding_count !== 1 ? "s" : ""}`}
+                />
+                <StatCard
+                  size="sm"
+                  label="Total"
+                  value={formatCurrency(a.total_value, a.currency)}
+                />
                 {a.currency !== baseCurrency && (
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Total ({baseCurrency})
-                    </span>
-                    <span>{fmtCur(a.total_value_base, baseCurrency)}</span>
-                  </div>
+                  <StatCard
+                    size="sm"
+                    label={`Total (${baseCurrency})`}
+                    value={formatCurrency(a.total_value_base, baseCurrency)}
+                  />
                 )}
               </div>
             </CardContent>

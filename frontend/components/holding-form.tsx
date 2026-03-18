@@ -3,6 +3,14 @@
 import type { HoldingInput, Account } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
 const ASSET_TYPES = ["equity", "bond", "crypto", "commodity", "other", "managed"] as const;
 const BREAKDOWN_CATEGORIES = ["equity", "bond", "crypto", "cash", "commodity"] as const;
@@ -19,7 +27,10 @@ interface HoldingFormProps {
 export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
   return (
     <>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 mb-4">
+      <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
+        Identity
+      </p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Name</Label>
           <Input
@@ -37,21 +48,31 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Type</Label>
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={form.asset_type}
-            onChange={(e) => {
-              const newType = e.target.value;
-              const clearBreakdown = newType !== "managed" ? { allocation_breakdown: null } : {};
-              setForm({ ...form, asset_type: newType, ...clearBreakdown });
-            }}
+          <Label className="text-xs text-muted-foreground">Account</Label>
+          <Select
+            value={String(form.account_id)}
+            onValueChange={(val) => val && setForm({ ...form, account_id: Number(val) })}
           >
-            {ASSET_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={String(a.id)}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      </div>
+
+      <Separator className="my-4" />
+
+      <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
+        Financials
+      </p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Quantity</Label>
           <Input
@@ -74,27 +95,51 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
         </div>
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Currency</Label>
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+          <Select
             value={form.currency}
-            onChange={(e) => setForm({ ...form, currency: e.target.value })}
+            onValueChange={(val) => val && setForm({ ...form, currency: val })}
           >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      </div>
+
+      <Separator className="my-4" />
+
+      <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
+        Classification
+      </p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         <div className="flex flex-col gap-1">
-          <Label className="text-xs text-muted-foreground">Account</Label>
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={form.account_id}
-            onChange={(e) => setForm({ ...form, account_id: Number(e.target.value) })}
+          <Label className="text-xs text-muted-foreground">Type</Label>
+          <Select
+            value={form.asset_type}
+            onValueChange={(val) => {
+              if (!val) return;
+              const clearBreakdown = val !== "managed" ? { allocation_breakdown: null } : {};
+              setForm({ ...form, asset_type: val, ...clearBreakdown });
+            }}
           >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ASSET_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Sector</Label>
@@ -127,10 +172,12 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
       </div>
 
       {form.asset_type === "managed" && (
-        <div className="mt-3 rounded-md border border-border bg-card p-3">
-          <p className="mb-2 text-sm font-semibold">
-            Allocation Breakdown (must sum to 100%)
+        <>
+          <Separator className="my-4" />
+          <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground">
+            Allocation Breakdown
           </p>
+          <p className="mb-2 text-xs text-muted-foreground">Must sum to 100%</p>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
             {BREAKDOWN_CATEGORIES.map((cat) => {
               const bd = form.allocation_breakdown || {};
@@ -170,7 +217,7 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
             )}
             %
           </p>
-        </div>
+        </>
       )}
     </>
   );
