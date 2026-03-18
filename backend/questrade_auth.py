@@ -10,7 +10,14 @@ from pathlib import Path
 
 import httpx
 
-TOKEN_FILE = Path(__file__).resolve().parent.parent / "data" / "questrade_token.json"
+import os as _os
+
+TOKEN_FILE = Path(
+    _os.environ.get(
+        "QUESTRADE_TOKEN_PATH",
+        str(Path(__file__).resolve().parent.parent / "data" / "questrade_token.json"),
+    )
+)
 AUTH_URL = "https://login.questrade.com/oauth2/token"
 
 

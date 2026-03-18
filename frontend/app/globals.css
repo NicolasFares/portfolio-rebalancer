@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-dm-serif);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Custom app colors — warm palette */
+  --color-green: #6dbe8b;
+  --color-red: #d97373;
+  --color-yellow: #d4a44a;
+  --color-blue: #6ba3c7;
+  --color-orange: #c97a52;
+  --color-purple: #9e8abf;
+  --color-gold: #c9a84c;
+}
+
+/* Midnight Gold — warm dark finance aesthetic */
+:root {
+  --background: hsl(20 6% 6%);
+  --foreground: hsl(30 10% 88%);
+  --card: hsl(20 4% 10%);
+  --card-foreground: hsl(30 10% 88%);
+  --popover: hsl(20 4% 10%);
+  --popover-foreground: hsl(30 10% 88%);
+  --primary: hsl(36 45% 60%);
+  --primary-foreground: hsl(20 6% 6%);
+  --secondary: hsl(20 4% 13%);
+  --secondary-foreground: hsl(30 10% 88%);
+  --muted: hsl(20 4% 13%);
+  --muted-foreground: hsl(20 5% 50%);
+  --accent: hsl(20 4% 13%);
+  --accent-foreground: hsl(30 10% 88%);
+  --destructive: hsl(0 55% 60%);
+  --border: hsl(20 5% 15%);
+  --input: hsl(20 5% 15%);
+  --ring: hsl(36 45% 60%);
+  --chart-1: hsl(36 45% 60%);
+  --chart-2: hsl(200 35% 55%);
+  --chart-3: hsl(145 30% 50%);
+  --chart-4: hsl(15 50% 55%);
+  --chart-5: hsl(270 25% 55%);
+  --radius: 0.5rem;
+  --sidebar: hsl(20 4% 10%);
+  --sidebar-foreground: hsl(30 10% 88%);
+  --sidebar-primary: hsl(36 45% 60%);
+  --sidebar-primary-foreground: hsl(20 6% 6%);
+  --sidebar-accent: hsl(20 4% 13%);
+  --sidebar-accent-foreground: hsl(30 10% 88%);
+  --sidebar-border: hsl(20 5% 15%);
+  --sidebar-ring: hsl(36 45% 60%);
+}
+
+/* Fade-in-up animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 80ms; }
+.stagger-3 { animation-delay: 160ms; }
+.stagger-4 { animation-delay: 240ms; }
+.stagger-5 { animation-delay: 320ms; }
+
+.font-tabular {
+  font-feature-settings: "tnum";
+}
+
+@keyframes donutGrow {
+  from {
+    stroke-dasharray: 0 1000;
+  }
+}
+
+.hover-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.hover-card:hover {
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+  html {
+    @apply font-sans;
+  }
+}
