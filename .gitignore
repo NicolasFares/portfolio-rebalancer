@@ -4,5 +4,6 @@ __pycache__/
 data/*.db
 data/questrade_token.json
 node_modules/
+.next/
 dist/
 .env
