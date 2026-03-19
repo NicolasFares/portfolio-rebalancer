@@ -18,6 +18,8 @@ TOKEN_FILE = Path(
         str(Path(__file__).resolve().parent.parent / "data" / "questrade_token.json"),
     )
 )
+if TOKEN_FILE.is_dir():
+    TOKEN_FILE = TOKEN_FILE / "questrade_token.json"
 AUTH_URL = "https://login.questrade.com/oauth2/token"
 
 

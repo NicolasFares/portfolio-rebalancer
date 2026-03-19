@@ -193,7 +193,11 @@ export default function Rebalance() {
         </Tabs>
         <Select value={filterAccountId} onValueChange={(val) => val && setFilterAccountId(val)}>
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {filterAccountId === "all"
+                ? "All Accounts"
+                : portfolio.accounts.find(a => String(a.id) === filterAccountId)?.name || filterAccountId}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Accounts</SelectItem>
