@@ -56,6 +56,19 @@ Single container runs both backend (port 8000 internal) and frontend (port 3000 
 | `DATABASE_PATH` | SQLite database file path | `data/portfolio.db` |
 | `QUESTRADE_REFRESH_TOKEN` | Auto-connect Questrade on startup | — |
 | `QUESTRADE_TOKEN_PATH` | Path to store Questrade OAuth tokens | `data/questrade_token.json` |
+| `QUESTRADE_ENCRYPTION_KEY` | Fernet key for encrypting stored OAuth tokens at rest. Auto-generated if unset. | auto-generated |
+
+## Security — Token Encryption
+
+Questrade OAuth tokens are encrypted at rest using [Fernet](https://cryptography.io/en/latest/fernet/) symmetric encryption.
+
+- **First run:** If `QUESTRADE_ENCRYPTION_KEY` is not set, a key is auto-generated and logged at startup. Copy it into your environment (e.g. `docker run -e QUESTRADE_ENCRYPTION_KEY=...`) to persist across container rebuilds.
+- **Plaintext migration:** Existing plaintext token files are automatically encrypted on first read.
+- **Generate a key manually:**
+  ```bash
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  ```
+- **Lost key:** If you lose the encryption key, delete the token file and re-authenticate via the Questrade panel.
 
 ## Tech Stack
 

@@ -44,6 +44,9 @@ RUN mkdir -p /app/data
 # Environment
 ENV DATABASE_PATH=/app/data/portfolio.db
 ENV QUESTRADE_TOKEN_PATH=/app/data/questrade_token.json
+# Optional: Fernet key for encrypting Questrade tokens at rest.
+# If unset, auto-generated on startup (logged once; save it for restarts).
+# ENV QUESTRADE_ENCRYPTION_KEY=
 
 EXPOSE 3000
 VOLUME /app/data

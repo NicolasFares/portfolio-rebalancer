@@ -2,15 +2,20 @@
 
 Stores tokens in data/questrade_token.json (gitignored).
 Handles token exchange and auto-rotation of refresh tokens.
+Tokens are encrypted at rest using Fernet symmetric encryption.
 """
 
 import json
+import logging
 import time
 from pathlib import Path
 
 import httpx
+from cryptography.fernet import Fernet, InvalidToken
 
 import os as _os
+
+logger = logging.getLogger(__name__)
 
 TOKEN_FILE = Path(
     _os.environ.get(
@@ -23,15 +28,53 @@ if TOKEN_FILE.is_dir():
 AUTH_URL = "https://login.questrade.com/oauth2/token"
 
 
+def _init_fernet(key: str | None) -> Fernet:
+    """Initialize Fernet cipher from a key string, or generate one if not provided."""
+    if key:
+        try:
+            return Fernet(key.encode() if isinstance(key, str) else key)
+        except Exception:
+            raise ValueError(
+                "QUESTRADE_ENCRYPTION_KEY is not a valid Fernet key. "
+                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+    generated = Fernet.generate_key()
+    logger.warning(
+        "No QUESTRADE_ENCRYPTION_KEY set. Generated key: %s  "
+        "— Save this in your environment to decrypt tokens after restart.",
+        generated.decode(),
+    )
+    return Fernet(generated)
+
+
+_fernet = _init_fernet(_os.environ.get("QUESTRADE_ENCRYPTION_KEY"))
+
+
 def _read_token() -> dict | None:
     if not TOKEN_FILE.exists():
         return None
-    return json.loads(TOKEN_FILE.read_text())
+    raw = TOKEN_FILE.read_bytes()
+    try:
+        plaintext = _fernet.decrypt(raw)
+        return json.loads(plaintext)
+    except InvalidToken:
+        # Might be a legacy plaintext file — attempt migration
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise ValueError(
+                "Token file is corrupted or was encrypted with a different key. "
+                "Set the correct QUESTRADE_ENCRYPTION_KEY or delete the token file and re-authenticate."
+            )
+        logger.info("Migrating plaintext token file to encrypted format.")
+        _write_token(data)
+        return data
 
 
 def _write_token(data: dict) -> None:
     TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    TOKEN_FILE.write_text(json.dumps(data, indent=2))
+    plaintext = json.dumps(data, indent=2).encode()
+    TOKEN_FILE.write_bytes(_fernet.encrypt(plaintext))
 
 
 def exchange_token(refresh_token: str) -> dict:
