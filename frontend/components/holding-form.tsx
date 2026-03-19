@@ -54,7 +54,9 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
             onValueChange={(val) => val && setForm({ ...form, account_id: Number(val) })}
           >
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <SelectValue>
+                {accounts.find(a => String(a.id) === String(form.account_id))?.name || "Select account"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {accounts.map((a) => (
