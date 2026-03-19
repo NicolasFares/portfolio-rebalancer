@@ -55,7 +55,6 @@ Single container runs both backend (port 8000 internal) and frontend (port 3000 
 |---|---|---|
 | `DATABASE_PATH` | SQLite database file path | `data/portfolio.db` |
 | `QUESTRADE_REFRESH_TOKEN` | Auto-connect Questrade on startup | — |
-| `QUESTRADE_TOKEN_PATH` | Path to store Questrade OAuth tokens | `data/questrade_token.json` |
 | `QUESTRADE_ENCRYPTION_KEY` | Fernet key for encrypting stored OAuth tokens at rest. Auto-generated if unset. | auto-generated |
 
 ## Security — Token Encryption
