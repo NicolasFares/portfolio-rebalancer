@@ -8,7 +8,7 @@ from sqlalchemy import inspect, text
 
 from .database import Base, engine
 from .questrade_auth import exchange_token, _read_token
-from .routers import portfolios, holdings, targets, questrade, accounts, sync
+from .routers import portfolios, holdings, targets, questrade, accounts, sync, snapshots
 
 load_dotenv()
 
@@ -178,3 +178,4 @@ app.include_router(targets.router)
 app.include_router(questrade.router)
 app.include_router(accounts.router)
 app.include_router(sync.router)
+app.include_router(snapshots.router)

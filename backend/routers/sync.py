@@ -13,6 +13,7 @@ from ..schemas import (
 )
 from ..services.price_sync import fetch_prices
 from ..services.exchange_rates import fetch_ecb_rates, compute_rates_for_base
+from ..services.snapshots import create_snapshot
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
@@ -79,6 +80,7 @@ def sync_prices(
                     old_price=old_price,
                     new_price=data["price"],
                     currency=data["currency"],
+                    price_date=data.get("price_date"),
                 )
             )
         else:
@@ -88,6 +90,13 @@ def sync_prices(
             errors.append(f"Failed to fetch price for {yf_name}")
 
     db.commit()
+
+    # Auto-create snapshot after successful price sync
+    try:
+        create_snapshot(db, portfolio_id)
+    except Exception:
+        pass  # Snapshot failure shouldn't break price sync
+
     failed = len(syncable) - updated
     return PriceSyncResult(
         updated=updated, failed=failed, details=details, errors=errors

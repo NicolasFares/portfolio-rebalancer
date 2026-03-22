@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Wallet, Scale, ChevronRight } from "lucide-react";
+import { BarChart3, Wallet, Scale, LineChart, ChevronRight } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 interface PortfolioNavProps {
@@ -14,6 +14,7 @@ const tabs = [
   { label: "Holdings", href: "", icon: BarChart3 },
   { label: "Accounts", href: "/accounts", icon: Wallet },
   { label: "Rebalance", href: "/rebalance", icon: Scale },
+  { label: "History", href: "/history", icon: LineChart },
 ] as const;
 
 export function PortfolioNav({ portfolioId, portfolioName }: PortfolioNavProps) {

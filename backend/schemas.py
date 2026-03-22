@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, field_validator, model_validator
 
 from .services.price_sync import VALID_EXCHANGES
@@ -148,6 +148,7 @@ class PriceSyncDetail(BaseModel):
     old_price: float
     new_price: float
     currency: str
+    price_date: date | None = None
 
 
 class PriceSyncResult(BaseModel):
@@ -231,3 +232,49 @@ class RebalanceResult(BaseModel):
     total_value: float
     base_currency: str
     suggestions: list[RebalanceSuggestion]
+
+
+# ── Snapshots ────────────────────────────────────────────
+
+class SnapshotSummary(BaseModel):
+    id: int
+    snapshot_date: date
+    total_value_base: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PortfolioHistoryPoint(BaseModel):
+    date: date
+    total_value_base: float
+    cash_value_base: float
+
+
+class PortfolioHistoryResponse(BaseModel):
+    base_currency: str
+    data_points: list[PortfolioHistoryPoint]
+
+
+class AllocationHistoryPoint(BaseModel):
+    date: date
+    values: dict[str, float]
+
+
+class AllocationHistoryResponse(BaseModel):
+    dimension: str
+    categories: list[str]
+    data_points: list[AllocationHistoryPoint]
+
+
+class HoldingHistoryPoint(BaseModel):
+    date: date
+    quantity: float
+    price_per_unit: float
+    value_base: float
+
+
+class HoldingHistoryResponse(BaseModel):
+    holding_name: str
+    ticker: str | None
+    data_points: list[HoldingHistoryPoint]

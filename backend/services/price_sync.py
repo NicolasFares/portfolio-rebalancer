@@ -88,8 +88,8 @@ def fetch_prices(
         holdings: List of dicts with keys: id, ticker, exchange, asset_type
 
     Returns:
-        {holding_id: {"price": float, "currency": str}} for each
-        successfully fetched holding.
+        {holding_id: {"price": float, "currency": str, "price_date": date}}
+        for each successfully fetched holding.
     """
     if not holdings:
         return {}
@@ -110,14 +110,19 @@ def fetch_prices(
 
     for yf_ticker in yf_tickers:
         try:
-            info = tickers_obj.tickers[yf_ticker].fast_info
-            price = float(info.last_price)
-            currency = str(info.currency).upper()
+            ticker_obj = tickers_obj.tickers[yf_ticker]
+            hist = ticker_obj.history(period="5d")
+            if hist.empty:
+                continue
+            price = float(hist["Close"].iloc[-1])
+            price_date = hist.index[-1].date()
+            currency = str(ticker_obj.fast_info.currency).upper()
 
             for h in ticker_to_holdings[yf_ticker]:
                 results[h["id"]] = {
                     "price": price,
                     "currency": currency,
+                    "price_date": price_date,
                 }
         except Exception:
             # Individual ticker failure — skip, will be reported as failed
