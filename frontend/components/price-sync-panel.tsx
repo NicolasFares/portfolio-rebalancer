@@ -54,7 +54,7 @@ export function PriceSyncPanel({ portfolioId, onSyncComplete }: PriceSyncPanelPr
         <div className="mt-2 rounded-lg border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Fetch latest prices for all holdings with tickers.
+              Fetch latest prices for publicly-traded holdings. Managed and private holdings are skipped.
             </p>
             <Button onClick={handleSync} disabled={syncing} className="ml-auto">
               {syncing ? "Syncing..." : "Sync Prices"}

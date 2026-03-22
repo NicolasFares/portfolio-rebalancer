@@ -2,6 +2,8 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, field_validator, model_validator
 
+from .services.price_sync import VALID_EXCHANGES
+
 
 # ── Accounts ─────────────────────────────────────────────
 
@@ -59,6 +61,13 @@ class HoldingCreate(BaseModel):
     geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
 
+    @field_validator("exchange", mode="before")
+    @classmethod
+    def validate_exchange(cls, v: str | None) -> str | None:
+        if v is not None and v != "" and v not in VALID_EXCHANGES:
+            raise ValueError(f"Unknown exchange '{v}'. Valid: {', '.join(sorted(VALID_EXCHANGES))}")
+        return v if v != "" else None
+
     @model_validator(mode="after")
     def validate_managed(self):
         if self.asset_type == "managed":
@@ -82,6 +91,13 @@ class HoldingUpdate(BaseModel):
     sector: str | None = None
     geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
+
+    @field_validator("exchange", mode="before")
+    @classmethod
+    def validate_exchange(cls, v: str | None) -> str | None:
+        if v is not None and v != "" and v not in VALID_EXCHANGES:
+            raise ValueError(f"Unknown exchange '{v}'. Valid: {', '.join(sorted(VALID_EXCHANGES))}")
+        return v if v != "" else None
 
     @model_validator(mode="after")
     def validate_managed(self):

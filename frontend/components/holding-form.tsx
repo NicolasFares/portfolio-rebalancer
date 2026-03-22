@@ -15,7 +15,11 @@ import {
 const ASSET_TYPES = ["equity", "bond", "crypto", "commodity", "other", "managed"] as const;
 const BREAKDOWN_CATEGORIES = ["equity", "bond", "crypto", "cash", "commodity"] as const;
 const CURRENCIES = ["CAD", "EUR", "USD"] as const;
-const EXCHANGE_SUGGESTIONS = ["TSX", "NYSE", "NASDAQ", "LSE", "FRA", "PAR", "ASX", "HKEX", "TYO"];
+const EXCHANGES = [
+  "TSX", "TSXV", "NYSE", "NASDAQ", "AMEX", "NYSEARCA",
+  "LSE", "FRA", "PAR", "AMS", "BRU", "MIL", "MAD",
+  "ASX", "HKEX", "TYO", "SGX", "KRX", "NSE", "BSE",
+] as const;
 const SECTOR_SUGGESTIONS = ["broad_market", "defense", "technology", "energy", "gold", "healthcare", "financials"];
 const GEO_SUGGESTIONS = ["US", "EU", "Global", "CAD", "Emerging"];
 
@@ -50,17 +54,22 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
         </div>
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Exchange</Label>
-          <Input
-            list="exchange-suggestions"
-            value={form.exchange || ""}
-            onChange={(e) => setForm({ ...form, exchange: e.target.value })}
-            placeholder="e.g. TSX"
-          />
-          <datalist id="exchange-suggestions">
-            {EXCHANGE_SUGGESTIONS.map((ex) => (
-              <option key={ex} value={ex} />
-            ))}
-          </datalist>
+          <Select
+            value={form.exchange || "_none"}
+            onValueChange={(val) => val && setForm({ ...form, exchange: val === "_none" ? "" : val })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">None (private)</SelectItem>
+              {EXCHANGES.map((ex) => (
+                <SelectItem key={ex} value={ex}>
+                  {ex}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Account</Label>

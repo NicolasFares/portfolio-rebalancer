@@ -2,7 +2,36 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 import yfinance as yf
+
+
+class Exchange(StrEnum):
+    """Known stock exchanges with yfinance ticker suffix mappings."""
+    TSX = "TSX"
+    TSXV = "TSXV"
+    NYSE = "NYSE"
+    NASDAQ = "NASDAQ"
+    AMEX = "AMEX"
+    NYSEARCA = "NYSEARCA"
+    LSE = "LSE"
+    FRA = "FRA"
+    PAR = "PAR"
+    AMS = "AMS"
+    BRU = "BRU"
+    MIL = "MIL"
+    MAD = "MAD"
+    ASX = "ASX"
+    HKEX = "HKEX"
+    TYO = "TYO"
+    SGX = "SGX"
+    KRX = "KRX"
+    NSE = "NSE"
+    BSE = "BSE"
+
+
+VALID_EXCHANGES: set[str] = {e.value for e in Exchange}
 
 
 # Maps exchange codes to yfinance ticker suffixes

@@ -33,10 +33,17 @@ def sync_prices(
     if body and body.holding_ids:
         all_holdings = [h for h in all_holdings if h.id in body.holding_ids]
 
-    # Filter to holdings that have a ticker
-    syncable = [h for h in all_holdings if h.ticker]
+    # Filter to publicly-traded holdings (have a ticker, not managed/private)
+    syncable = [
+        h for h in all_holdings
+        if h.ticker and h.asset_type not in ("managed", "cash")
+    ]
+    skipped = len(all_holdings) - len(syncable)
     if not syncable:
-        return PriceSyncResult(updated=0, failed=0, details=[], errors=[])
+        errors = []
+        if skipped > 0:
+            errors.append(f"Skipped {skipped} holding(s) without tickers or with managed/cash type")
+        return PriceSyncResult(updated=0, failed=0, details=[], errors=errors)
 
     # Build input for price service
     holding_dicts = [
