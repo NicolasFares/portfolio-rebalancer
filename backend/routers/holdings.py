@@ -32,6 +32,7 @@ def _holding_out(h: Holding) -> dict:
         "currency": h.currency,
         "sector": h.sector,
         "geography": h.geography,
+        "avg_buy_price": h.avg_buy_price,
         "allocation_breakdown": h.allocation_breakdown,
         "created_at": h.created_at,
         "updated_at": h.updated_at,

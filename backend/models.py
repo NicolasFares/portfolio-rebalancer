@@ -64,6 +64,7 @@ class Holding(Base):
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     price_per_unit: Mapped[float] = mapped_column(Float, nullable=False)
     currency: Mapped[str] = mapped_column(Text, nullable=False, default="CAD")
+    avg_buy_price: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     sector: Mapped[str | None] = mapped_column(Text)        # "defense", "technology", "gold", "energy", etc.
     geography: Mapped[str | None] = mapped_column(Text)     # "US", "EU", "Global", etc.
     allocation_breakdown: Mapped[str | None] = mapped_column(Text)  # JSON: {"equity": 60, "bond": 40}

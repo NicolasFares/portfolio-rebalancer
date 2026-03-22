@@ -48,6 +48,7 @@ def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
                 quantity=h.quantity,
                 price_per_unit=h.price_per_unit,
                 currency=h.currency,
+                avg_buy_price=h.avg_buy_price,
                 sector=h.sector,
                 geography=h.geography,
                 allocation_breakdown=h.allocation_breakdown,

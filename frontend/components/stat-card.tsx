@@ -7,9 +7,10 @@ interface StatCardProps {
   value: string;
   subtitle?: string;
   size?: "sm" | "lg";
+  valueClassName?: string;
 }
 
-export function StatCard({ label, value, subtitle, size = "sm" }: StatCardProps) {
+export function StatCard({ label, value, subtitle, size = "sm", valueClassName }: StatCardProps) {
   return (
     <div
       className={cn(
@@ -25,7 +26,8 @@ export function StatCard({ label, value, subtitle, size = "sm" }: StatCardProps)
           "font-tabular mt-1",
           size === "lg"
             ? "font-serif text-2xl text-primary"
-            : "text-lg font-medium"
+            : "text-lg font-medium",
+          valueClassName,
         )}
       >
         {value}

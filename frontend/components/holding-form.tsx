@@ -113,6 +113,21 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
             </SelectContent>
           </Select>
         </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Avg Buy Price</Label>
+          <Input
+            type="number"
+            step="any"
+            value={form.avg_buy_price ?? ""}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                avg_buy_price: e.target.value === "" ? null : Number(e.target.value),
+              })
+            }
+            placeholder="Optional"
+          />
+        </div>
       </div>
 
       <Separator className="my-4" />

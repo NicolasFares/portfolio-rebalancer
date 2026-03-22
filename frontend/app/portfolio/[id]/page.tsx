@@ -12,7 +12,7 @@ import {
   updateHolding,
   updatePortfolio,
 } from "@/lib/api";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatPnl } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +82,7 @@ const emptyHolding: HoldingInput = {
   price_per_unit: 0,
   currency: "CAD",
   account_id: 0,
+  avg_buy_price: null,
   sector: "",
   geography: "",
 };
@@ -141,6 +142,17 @@ export default function PortfolioDetail() {
   );
   const totalValue = holdingsValue + accountCashValue;
 
+  const totalPnl = portfolio.holdings.reduce((sum, h) => {
+    if (h.pnl == null) return sum;
+    return sum + toBase(h.pnl, h.currency);
+  }, 0);
+  const holdingsWithPnl = portfolio.holdings.filter((h) => h.pnl != null);
+  const totalCostBasis = holdingsWithPnl.reduce(
+    (sum, h) => sum + toBase(h.avg_buy_price! * h.quantity, h.currency),
+    0,
+  );
+  const totalPnlPct = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : null;
+
   const computeByDimension = (dim: string) => {
     const result: Record<string, number> = {};
     portfolio.holdings.forEach((h) => {
@@ -196,6 +208,7 @@ export default function PortfolioDetail() {
       price_per_unit: h.price_per_unit,
       currency: h.currency,
       account_id: h.account_id,
+      avg_buy_price: h.avg_buy_price,
       sector: h.sector || "",
       geography: h.geography || "",
       allocation_breakdown: h.allocation_breakdown || null,
@@ -229,8 +242,14 @@ export default function PortfolioDetail() {
       </div>
 
       {/* Stat Cards Grid */}
-      <div className="animate-fade-in-up stagger-2 mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="animate-fade-in-up stagger-2 mb-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label="Total Value" value={fmt(totalValue)} subtitle={portfolio.base_currency} size="lg" />
+        <StatCard
+          label="Total P&L"
+          value={holdingsWithPnl.length > 0 ? formatPnl(totalPnl, portfolio.base_currency) : "N/A"}
+          subtitle={totalPnlPct != null ? `${totalPnlPct >= 0 ? "+" : ""}${totalPnlPct.toFixed(1)}%` : undefined}
+          valueClassName={holdingsWithPnl.length > 0 ? (totalPnl >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400") : undefined}
+        />
         <StatCard label="Holdings" value={String(portfolio.holdings.length)} />
         <StatCard label="Accounts" value={String(portfolio.accounts.length)} />
         <StatCard label="Cash Balance" value={fmt(accountCashValue)} />
@@ -311,6 +330,7 @@ export default function PortfolioDetail() {
                   <TableHead>Qty</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Value</TableHead>
+                  <TableHead className="hidden lg:table-cell">P&L</TableHead>
                   <TableHead>Account</TableHead>
                   <TableHead />
                 </TableRow>
@@ -349,6 +369,19 @@ export default function PortfolioDetail() {
                     <TableCell className="font-tabular">
                       {(h.quantity * h.price_per_unit).toLocaleString()}{" "}
                       {h.currency}
+                    </TableCell>
+                    <TableCell className="hidden font-tabular lg:table-cell">
+                      {h.pnl != null ? (
+                        <span className={h.pnl >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                          {formatPnl(h.pnl, h.currency)}
+                          <br />
+                          <span className="text-xs">
+                            ({h.pnl_pct! >= 0 ? "+" : ""}{h.pnl_pct!.toFixed(1)}%)
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">N/A</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {h.account_name || "—"}

@@ -27,6 +27,8 @@ def _migrate(engine):
                 conn.execute(text("ALTER TABLE holdings ADD COLUMN sector TEXT"))
             if "geography" not in holding_cols:
                 conn.execute(text("ALTER TABLE holdings ADD COLUMN geography TEXT"))
+            if "avg_buy_price" not in holding_cols:
+                conn.execute(text("ALTER TABLE holdings ADD COLUMN avg_buy_price FLOAT"))
 
     if "allocation_targets" in inspector.get_table_names():
         target_cols = {c["name"] for c in inspector.get_columns("allocation_targets")}

@@ -183,6 +183,9 @@ def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(ge
             h.quantity = quantity
             h.price_per_unit = price
             h.currency = currency
+            avg_entry = pos.get("averageEntryPrice")
+            if avg_entry:
+                h.avg_buy_price = avg_entry
             # Set account_id if still unset
             if acct_entity:
                 h.account_id = acct_entity.id
@@ -202,6 +205,7 @@ def sync_holdings(portfolio_id: int, body: SyncRequest, db: Session = Depends(ge
                 quantity=quantity,
                 price_per_unit=price,
                 currency=currency,
+                avg_buy_price=pos.get("averageEntryPrice"),
             )
             db.add(h)
             added += 1

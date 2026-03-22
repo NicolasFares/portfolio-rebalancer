@@ -46,6 +46,9 @@ export interface Holding {
   quantity: number;
   price_per_unit: number;
   currency: string;
+  avg_buy_price: number | null;
+  pnl: number | null;
+  pnl_pct: number | null;
   sector: string | null;
   geography: string | null;
   allocation_breakdown: Record<string, number> | null;
@@ -96,6 +99,7 @@ export interface HoldingInput {
   price_per_unit: number;
   currency: string;
   account_id: number;
+  avg_buy_price?: number | null;
   sector?: string;
   geography?: string;
   allocation_breakdown?: Record<string, number> | null;
