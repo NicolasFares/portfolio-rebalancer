@@ -54,6 +54,7 @@ class HoldingCreate(BaseModel):
     price_per_unit: float
     currency: str = "CAD"
     account_id: int
+    avg_buy_price: float | None = None
     sector: str | None = None
     geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
@@ -77,6 +78,7 @@ class HoldingUpdate(BaseModel):
     price_per_unit: float | None = None
     currency: str | None = None
     account_id: int | None = None
+    avg_buy_price: float | None = None
     sector: str | None = None
     geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
@@ -100,6 +102,9 @@ class HoldingOut(BaseModel):
     quantity: float
     price_per_unit: float
     currency: str
+    avg_buy_price: float | None = None
+    pnl: float | None = None
+    pnl_pct: float | None = None
     sector: str | None = None
     geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
@@ -115,6 +120,13 @@ class HoldingOut(BaseModel):
         if isinstance(v, str):
             return json.loads(v)
         return v
+
+    @model_validator(mode="after")
+    def compute_pnl(self):
+        if self.avg_buy_price is not None and self.avg_buy_price > 0:
+            self.pnl = round((self.price_per_unit - self.avg_buy_price) * self.quantity, 2)
+            self.pnl_pct = round(((self.price_per_unit - self.avg_buy_price) / self.avg_buy_price) * 100, 2)
+        return self
 
 
 # ── Targets ───────────────────────────────────────────────
