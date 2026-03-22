@@ -49,6 +49,7 @@ class AccountWithStats(AccountOut):
 class HoldingCreate(BaseModel):
     name: str
     ticker: str | None = None
+    exchange: str | None = None
     asset_type: str
     quantity: float
     price_per_unit: float
@@ -72,6 +73,7 @@ class HoldingCreate(BaseModel):
 class HoldingUpdate(BaseModel):
     name: str | None = None
     ticker: str | None = None
+    exchange: str | None = None
     asset_type: str | None = None
     quantity: float | None = None
     price_per_unit: float | None = None
@@ -96,6 +98,7 @@ class HoldingOut(BaseModel):
     account_name: str = ""
     name: str
     ticker: str | None
+    exchange: str | None = None
     asset_type: str
     quantity: float
     price_per_unit: float
@@ -115,6 +118,34 @@ class HoldingOut(BaseModel):
         if isinstance(v, str):
             return json.loads(v)
         return v
+
+
+# ── Sync ─────────────────────────────────────────────────
+
+class PriceSyncRequest(BaseModel):
+    holding_ids: list[int] | None = None  # None = sync all
+
+
+class PriceSyncDetail(BaseModel):
+    holding_id: int
+    ticker: str
+    old_price: float
+    new_price: float
+    currency: str
+
+
+class PriceSyncResult(BaseModel):
+    updated: int
+    failed: int
+    details: list[PriceSyncDetail]
+    errors: list[str]
+
+
+class ExchangeRateSyncResult(BaseModel):
+    eur_to_base: float
+    usd_to_base: float
+    source: str
+    date: str
 
 
 # ── Targets ───────────────────────────────────────────────

@@ -26,6 +26,7 @@ def _holding_out(h: Holding) -> dict:
         "account_name": h.account_rel.name if h.account_rel else "",
         "name": h.name,
         "ticker": h.ticker,
+        "exchange": h.exchange,
         "asset_type": h.asset_type,
         "quantity": h.quantity,
         "price_per_unit": h.price_per_unit,

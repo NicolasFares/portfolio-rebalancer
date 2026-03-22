@@ -44,6 +44,7 @@ def get_portfolio(portfolio_id: int, db: Session = Depends(get_db)):
                 account_name=account.name,
                 name=h.name,
                 ticker=h.ticker,
+                exchange=h.exchange,
                 asset_type=h.asset_type,
                 quantity=h.quantity,
                 price_per_unit=h.price_per_unit,

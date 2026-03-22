@@ -11,6 +11,7 @@ import {
   deleteHolding,
   updateHolding,
   updatePortfolio,
+  syncExchangeRates,
 } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ import {
 import { DonutChart } from "@/components/donut-chart";
 import { HoldingDialog } from "@/components/holding-dialog";
 import { QuestradePanel } from "@/components/questrade-panel";
+import { PriceSyncPanel } from "@/components/price-sync-panel";
 import { PortfolioNav } from "@/components/portfolio-nav";
 import { StatCard } from "@/components/stat-card";
 import { EmptyState } from "@/components/empty-state";
@@ -77,6 +79,7 @@ const DIMENSION_LABELS: Record<string, string> = {
 const emptyHolding: HoldingInput = {
   name: "",
   ticker: "",
+  exchange: "",
   asset_type: "equity",
   quantity: 0,
   price_per_unit: 0,
@@ -99,6 +102,7 @@ export default function PortfolioDetail() {
   const [chartDimension, setChartDimension] = useState<string>("asset_type");
   const [filterAccountId, setFilterAccountId] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [fetchingRates, setFetchingRates] = useState(false);
 
   const load = () => {
     if (!id) return;
@@ -191,6 +195,7 @@ export default function PortfolioDetail() {
     setEditForm({
       name: h.name,
       ticker: h.ticker || "",
+      exchange: h.exchange || "",
       asset_type: h.asset_type,
       quantity: h.quantity,
       price_per_unit: h.price_per_unit,
@@ -219,6 +224,21 @@ export default function PortfolioDetail() {
     setEditingRates(false);
     toast.success("Exchange rates updated");
     load();
+  };
+
+  const handleFetchRates = async () => {
+    setFetchingRates(true);
+    try {
+      const result = await syncExchangeRates(Number(id));
+      setEurRate(result.eur_to_base);
+      setUsdRate(result.usd_to_base);
+      toast.success(`Exchange rates updated from ${result.source} (${result.date})`);
+      load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to fetch rates");
+    } finally {
+      setFetchingRates(false);
+    }
   };
 
   return (
@@ -323,6 +343,11 @@ export default function PortfolioDetail() {
                       {h.ticker && (
                         <span className="ml-2 text-xs text-muted-foreground">
                           {h.ticker}
+                          {h.exchange && (
+                            <span className="ml-1 text-[0.65rem] opacity-60">
+                              {h.exchange}
+                            </span>
+                          )}
                         </span>
                       )}
                     </TableCell>
@@ -480,7 +505,12 @@ export default function PortfolioDetail() {
                         <Button variant="ghost" size="sm" onClick={() => setEditingRates(false)}>Cancel</Button>
                       </>
                     ) : (
-                      <Button variant="ghost" size="sm" onClick={() => setEditingRates(true)}>Edit</Button>
+                      <>
+                        <Button variant="ghost" size="sm" onClick={handleFetchRates} disabled={fetchingRates}>
+                          {fetchingRates ? "Fetching..." : "Fetch Rates"}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingRates(true)}>Edit</Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -488,6 +518,11 @@ export default function PortfolioDetail() {
             </Card>
           </CollapsibleContent>
         </Collapsible>
+      </div>
+
+      {/* Price Sync — Collapsible */}
+      <div className="animate-fade-in-up stagger-5 mt-4">
+        <PriceSyncPanel portfolioId={Number(id)} onSyncComplete={load} />
       </div>
 
       {/* Questrade Sync — Collapsible */}

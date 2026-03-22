@@ -15,6 +15,7 @@ import {
 const ASSET_TYPES = ["equity", "bond", "crypto", "commodity", "other", "managed"] as const;
 const BREAKDOWN_CATEGORIES = ["equity", "bond", "crypto", "cash", "commodity"] as const;
 const CURRENCIES = ["CAD", "EUR", "USD"] as const;
+const EXCHANGE_SUGGESTIONS = ["TSX", "NYSE", "NASDAQ", "LSE", "FRA", "PAR", "ASX", "HKEX", "TYO"];
 const SECTOR_SUGGESTIONS = ["broad_market", "defense", "technology", "energy", "gold", "healthcare", "financials"];
 const GEO_SUGGESTIONS = ["US", "EU", "Global", "CAD", "Emerging"];
 
@@ -46,6 +47,20 @@ export function HoldingForm({ form, setForm, accounts }: HoldingFormProps) {
             onChange={(e) => setForm({ ...form, ticker: e.target.value })}
             placeholder="e.g. VOO"
           />
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Exchange</Label>
+          <Input
+            list="exchange-suggestions"
+            value={form.exchange || ""}
+            onChange={(e) => setForm({ ...form, exchange: e.target.value })}
+            placeholder="e.g. TSX"
+          />
+          <datalist id="exchange-suggestions">
+            {EXCHANGE_SUGGESTIONS.map((ex) => (
+              <option key={ex} value={ex} />
+            ))}
+          </datalist>
         </div>
         <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground">Account</Label>

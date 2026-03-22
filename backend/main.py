@@ -8,7 +8,7 @@ from sqlalchemy import inspect, text
 
 from .database import Base, engine
 from .questrade_auth import exchange_token, _read_token
-from .routers import portfolios, holdings, targets, questrade, accounts
+from .routers import portfolios, holdings, targets, questrade, accounts, sync
 
 load_dotenv()
 
@@ -27,6 +27,8 @@ def _migrate(engine):
                 conn.execute(text("ALTER TABLE holdings ADD COLUMN sector TEXT"))
             if "geography" not in holding_cols:
                 conn.execute(text("ALTER TABLE holdings ADD COLUMN geography TEXT"))
+            if "exchange" not in holding_cols:
+                conn.execute(text("ALTER TABLE holdings ADD COLUMN exchange TEXT"))
 
     if "allocation_targets" in inspector.get_table_names():
         target_cols = {c["name"] for c in inspector.get_columns("allocation_targets")}
@@ -120,6 +122,7 @@ def _migrate(engine):
                     account_id INTEGER NOT NULL REFERENCES accounts(id),
                     name TEXT NOT NULL,
                     ticker TEXT,
+                    exchange TEXT,
                     asset_type TEXT NOT NULL,
                     quantity FLOAT NOT NULL,
                     price_per_unit FLOAT NOT NULL,
@@ -133,9 +136,9 @@ def _migrate(engine):
             """))
             conn.execute(text("""
                 INSERT INTO holdings_new
-                    (id, account_id, name, ticker, asset_type, quantity, price_per_unit,
+                    (id, account_id, name, ticker, exchange, asset_type, quantity, price_per_unit,
                      currency, sector, geography, allocation_breakdown, created_at, updated_at)
-                SELECT id, account_id, name, ticker, asset_type, quantity, price_per_unit,
+                SELECT id, account_id, name, ticker, exchange, asset_type, quantity, price_per_unit,
                        currency, sector, geography, allocation_breakdown, created_at, updated_at
                 FROM holdings
             """))
@@ -174,3 +177,4 @@ app.include_router(holdings.router)
 app.include_router(targets.router)
 app.include_router(questrade.router)
 app.include_router(accounts.router)
+app.include_router(sync.router)
