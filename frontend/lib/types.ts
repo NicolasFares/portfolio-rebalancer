@@ -144,6 +144,7 @@ export interface PriceSyncDetail {
   old_price: number;
   new_price: number;
   currency: string;
+  price_date: string | null;
 }
 
 export interface PriceSyncResult {
@@ -158,4 +159,47 @@ export interface ExchangeRateSyncResult {
   usd_to_base: number;
   source: string;
   date: string;
+}
+
+// Snapshots
+export interface SnapshotSummary {
+  id: number;
+  snapshot_date: string;
+  total_value_base: number;
+  created_at: string;
+}
+
+export interface PortfolioHistoryPoint {
+  date: string;
+  total_value_base: number;
+  cash_value_base: number;
+}
+
+export interface PortfolioHistoryResponse {
+  base_currency: string;
+  data_points: PortfolioHistoryPoint[];
+}
+
+export interface AllocationHistoryPoint {
+  date: string;
+  values: Record<string, number>;
+}
+
+export interface AllocationHistoryResponse {
+  dimension: string;
+  categories: string[];
+  data_points: AllocationHistoryPoint[];
+}
+
+export interface HoldingHistoryPoint {
+  date: string;
+  quantity: number;
+  price_per_unit: number;
+  value_base: number;
+}
+
+export interface HoldingHistoryResponse {
+  holding_name: string;
+  ticker: string | null;
+  data_points: HoldingHistoryPoint[];
 }

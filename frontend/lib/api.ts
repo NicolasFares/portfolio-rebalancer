@@ -15,6 +15,10 @@ import type {
   Account,
   PriceSyncResult,
   ExchangeRateSyncResult,
+  SnapshotSummary,
+  PortfolioHistoryResponse,
+  AllocationHistoryResponse,
+  HoldingHistoryResponse,
 } from "./types";
 
 const BASE = "/api";
@@ -106,6 +110,37 @@ export const syncExchangeRates = (portfolioId: number) =>
   request<ExchangeRateSyncResult>(`/sync/${portfolioId}/exchange-rates`, {
     method: "POST",
   });
+
+// Snapshots
+export const createSnapshot = (portfolioId: number) =>
+  request<SnapshotSummary>(`/snapshots/${portfolioId}`, { method: "POST" });
+
+export const getSnapshots = (portfolioId: number, limit?: number) =>
+  request<SnapshotSummary[]>(`/snapshots/${portfolioId}${limit ? `?limit=${limit}` : ""}`);
+
+export const getPortfolioHistory = (portfolioId: number, from?: string, to?: string) => {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const qs = params.toString();
+  return request<PortfolioHistoryResponse>(`/snapshots/${portfolioId}/history${qs ? `?${qs}` : ""}`);
+};
+
+export const getAllocationHistory = (portfolioId: number, dimension: string, from?: string, to?: string) => {
+  const params = new URLSearchParams();
+  params.set("dimension", dimension);
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  return request<AllocationHistoryResponse>(`/snapshots/${portfolioId}/allocations?${params.toString()}`);
+};
+
+export const getHoldingHistory = (portfolioId: number, holdingId: number, from?: string, to?: string) => {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const qs = params.toString();
+  return request<HoldingHistoryResponse>(`/snapshots/${portfolioId}/holdings/${holdingId}${qs ? `?${qs}` : ""}`);
+};
 
 // Questrade
 export const questradeAuth = (refreshToken: string) =>

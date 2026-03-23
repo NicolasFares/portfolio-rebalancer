@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Plus, MoreHorizontal, Pencil, Trash2, PackageOpen, ChevronDown } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, PackageOpen, ChevronDown, Camera } from "lucide-react";
 import { toast } from "sonner";
 import type { PortfolioDetail as PDetail, HoldingInput } from "@/lib/types";
 import {
@@ -12,7 +12,10 @@ import {
   updateHolding,
   updatePortfolio,
   syncExchangeRates,
+  getSnapshots,
+  createSnapshot,
 } from "@/lib/api";
+import type { SnapshotSummary } from "@/lib/types";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +106,8 @@ export default function PortfolioDetail() {
   const [filterAccountId, setFilterAccountId] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [fetchingRates, setFetchingRates] = useState(false);
+  const [lastSnapshot, setLastSnapshot] = useState<SnapshotSummary | null>(null);
+  const [takingSnapshot, setTakingSnapshot] = useState(false);
 
   const load = () => {
     if (!id) return;
@@ -114,6 +119,22 @@ export default function PortfolioDetail() {
         setForm((f) => ({ ...f, account_id: p.accounts[0].id }));
       }
     });
+    getSnapshots(Number(id), 1).then((snaps) => {
+      setLastSnapshot(snaps.length > 0 ? snaps[0] : null);
+    });
+  };
+
+  const handleTakeSnapshot = async () => {
+    setTakingSnapshot(true);
+    try {
+      await createSnapshot(Number(id));
+      toast.success("Snapshot created");
+      load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to create snapshot");
+    } finally {
+      setTakingSnapshot(false);
+    }
   };
 
   useEffect(() => {
@@ -246,6 +267,19 @@ export default function PortfolioDetail() {
       {/* Sub-navigation with breadcrumb */}
       <div className="animate-fade-in-up stagger-1">
         <PortfolioNav portfolioId={id} portfolioName={portfolio.name} />
+      </div>
+
+      {/* Snapshot indicator */}
+      <div className="animate-fade-in-up stagger-2 mb-2 flex items-center justify-end gap-2">
+        {lastSnapshot && (
+          <span className="text-xs text-muted-foreground">
+            Last snapshot: {lastSnapshot.snapshot_date}
+          </span>
+        )}
+        <Button size="sm" variant="ghost" onClick={handleTakeSnapshot} disabled={takingSnapshot} className="h-7 text-xs">
+          <Camera className="mr-1 h-3 w-3" />
+          {takingSnapshot ? "Creating..." : "Snapshot"}
+        </Button>
       </div>
 
       {/* Stat Cards Grid */}
