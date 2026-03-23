@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 import httpx
 
 ECB_DAILY_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
-ECB_NS = {"gesmes": "http://www.gesmes.org/xml/2002-08-01", "ecb": "http://www.ecb.int/vocabulary/2002-08-01/euref"}
+ECB_NS = {"gesmes": "http://www.gesmes.org/xml/2002-08-01", "ecb": "http://www.ecb.int/vocabulary/2002-08-01/eurofxref"}
 
 
 def fetch_ecb_rates() -> tuple[dict[str, float], str]:
