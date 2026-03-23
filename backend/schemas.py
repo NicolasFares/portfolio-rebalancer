@@ -2,6 +2,8 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, field_validator, model_validator
 
+from .services.price_sync import VALID_EXCHANGES
+
 
 # ── Accounts ─────────────────────────────────────────────
 
@@ -49,6 +51,7 @@ class AccountWithStats(AccountOut):
 class HoldingCreate(BaseModel):
     name: str
     ticker: str | None = None
+    exchange: str | None = None
     asset_type: str
     quantity: float
     price_per_unit: float
@@ -57,6 +60,13 @@ class HoldingCreate(BaseModel):
     sector: str | None = None
     geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
+
+    @field_validator("exchange", mode="before")
+    @classmethod
+    def validate_exchange(cls, v: str | None) -> str | None:
+        if v is not None and v != "" and v not in VALID_EXCHANGES:
+            raise ValueError(f"Unknown exchange '{v}'. Valid: {', '.join(sorted(VALID_EXCHANGES))}")
+        return v if v != "" else None
 
     @model_validator(mode="after")
     def validate_managed(self):
@@ -72,6 +82,7 @@ class HoldingCreate(BaseModel):
 class HoldingUpdate(BaseModel):
     name: str | None = None
     ticker: str | None = None
+    exchange: str | None = None
     asset_type: str | None = None
     quantity: float | None = None
     price_per_unit: float | None = None
@@ -80,6 +91,13 @@ class HoldingUpdate(BaseModel):
     sector: str | None = None
     geography: str | None = None
     allocation_breakdown: dict[str, float] | None = None
+
+    @field_validator("exchange", mode="before")
+    @classmethod
+    def validate_exchange(cls, v: str | None) -> str | None:
+        if v is not None and v != "" and v not in VALID_EXCHANGES:
+            raise ValueError(f"Unknown exchange '{v}'. Valid: {', '.join(sorted(VALID_EXCHANGES))}")
+        return v if v != "" else None
 
     @model_validator(mode="after")
     def validate_managed(self):
@@ -96,6 +114,7 @@ class HoldingOut(BaseModel):
     account_name: str = ""
     name: str
     ticker: str | None
+    exchange: str | None = None
     asset_type: str
     quantity: float
     price_per_unit: float
@@ -115,6 +134,34 @@ class HoldingOut(BaseModel):
         if isinstance(v, str):
             return json.loads(v)
         return v
+
+
+# ── Sync ─────────────────────────────────────────────────
+
+class PriceSyncRequest(BaseModel):
+    holding_ids: list[int] | None = None  # None = sync all
+
+
+class PriceSyncDetail(BaseModel):
+    holding_id: int
+    ticker: str
+    old_price: float
+    new_price: float
+    currency: str
+
+
+class PriceSyncResult(BaseModel):
+    updated: int
+    failed: int
+    details: list[PriceSyncDetail]
+    errors: list[str]
+
+
+class ExchangeRateSyncResult(BaseModel):
+    eur_to_base: float
+    usd_to_base: float
+    source: str
+    date: str
 
 
 # ── Targets ───────────────────────────────────────────────

@@ -13,6 +13,8 @@ import type {
   AccountWithStats,
   AccountInput,
   Account,
+  PriceSyncResult,
+  ExchangeRateSyncResult,
 } from "./types";
 
 const BASE = "/api";
@@ -92,6 +94,18 @@ export const getRebalance = (portfolioId: number, dimension?: string, accountId?
   const qs = params.toString();
   return request<RebalanceResult>(`/portfolios/${portfolioId}/rebalance${qs ? `?${qs}` : ""}`);
 };
+
+// Price & Exchange Rate Sync
+export const syncPrices = (portfolioId: number, holdingIds?: number[]) =>
+  request<PriceSyncResult>(`/sync/${portfolioId}/prices`, {
+    method: "POST",
+    body: JSON.stringify(holdingIds ? { holding_ids: holdingIds } : {}),
+  });
+
+export const syncExchangeRates = (portfolioId: number) =>
+  request<ExchangeRateSyncResult>(`/sync/${portfolioId}/exchange-rates`, {
+    method: "POST",
+  });
 
 // Questrade
 export const questradeAuth = (refreshToken: string) =>

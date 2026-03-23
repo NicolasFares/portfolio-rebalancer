@@ -42,6 +42,7 @@ export interface Holding {
   account_name: string;
   name: string;
   ticker: string | null;
+  exchange: string | null;
   asset_type: string;
   quantity: number;
   price_per_unit: number;
@@ -91,6 +92,7 @@ export interface RebalanceResult {
 export interface HoldingInput {
   name: string;
   ticker?: string;
+  exchange?: string;
   asset_type: string;
   quantity: number;
   price_per_unit: number;
@@ -133,4 +135,27 @@ export interface SyncResult {
   added: number;
   updated: number;
   changes: SyncChange[];
+}
+
+// Price & Exchange Rate Sync
+export interface PriceSyncDetail {
+  holding_id: number;
+  ticker: string;
+  old_price: number;
+  new_price: number;
+  currency: string;
+}
+
+export interface PriceSyncResult {
+  updated: number;
+  failed: number;
+  details: PriceSyncDetail[];
+  errors: string[];
+}
+
+export interface ExchangeRateSyncResult {
+  eur_to_base: number;
+  usd_to_base: number;
+  source: string;
+  date: string;
 }

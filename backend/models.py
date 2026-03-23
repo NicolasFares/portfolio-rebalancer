@@ -60,6 +60,7 @@ class Holding(Base):
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     ticker: Mapped[str | None] = mapped_column(Text)
+    exchange: Mapped[str | None] = mapped_column(Text)  # "TSX", "NYSE", "LSE", etc.
     asset_type: Mapped[str] = mapped_column(Text, nullable=False)  # equity | bond | crypto | cash | other | managed
     quantity: Mapped[float] = mapped_column(Float, nullable=False)
     price_per_unit: Mapped[float] = mapped_column(Float, nullable=False)
